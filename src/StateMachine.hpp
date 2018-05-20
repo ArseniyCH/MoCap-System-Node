@@ -173,12 +173,14 @@ void color(int16_t r, int16_t g, int16_t b)
      */
 void state_setup()
 {
+  led.setup();
+  led.setup_color({0, 0, 100});
+  led.stateBlink();
+  stateBind();
+
   stateUndef();
   mpu.mpu_setup();
   mpu.disable();
-  led.setup();
-  led.setup_color({0, 0, 100});
-  led.stateOn();
 
   wc.onConnect(connect);
   wc.onDisconnect(disconnect);
@@ -187,10 +189,6 @@ void state_setup()
   wc.onBind(stateBind);
   wc.onCalibirate(stateCalibration);
   wc.onColor(color);
-
-  stateBind();
-
-  led.stateBlink();
 }
 
 String mac = String(WiFi.macAddress());

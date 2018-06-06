@@ -22,6 +22,8 @@ static const uint8_t D10  = 1;*/
 #include "LED.h"
 #include "math.h"
 
+#include <Ticker.h>
+
 LED::~LED() {}
 
 LED::LED(uint8_t Rpin, uint8_t Gpin, uint8_t Bpin)
@@ -47,10 +49,22 @@ void LED::setup_color(RGB first, RGB second)
     sec_color = second;
 }
 
-void LED::loop()
+void LED::loop(uint16_t q)
 {
-    current = calculate_values();
-    set_color(current);
+    Serial.print("Hi!");
+    led_ticker.attach_ms<LED *>(q, [](LED *led) {
+        Serial.print("R: ");
+        Serial.println(led->current.R);
+        Serial.print("G: ");
+        Serial.println(led->current.G);
+        Serial.print("B: ");
+        Serial.println(led->current.B);
+        led->current = calculate_values(led->current, led->steps, led->color, led->sec_color, led->rise);
+        led->set_color(led->current);
+    },
+                                this);
+
+    Serial.print("Hi!");
 }
 
 RGB LED::calculate_step(RGB prev, RGB end)
@@ -67,21 +81,21 @@ RGB LED::calculate_step(RGB prev, RGB end)
     return step;
 }
 
-RGB LED::calculate_values()
+RGB LED::calculate_values(RGB current, RGB steps, RGB color, RGB sec_color, bool &rise)
 {
     RGB updV = NONE;
 
-    updV.R = calc_value(current.R, steps.R, color.R, sec_color.R);
-    updV.G = calc_value(current.G, steps.G, color.G, sec_color.G);
-    updV.B = calc_value(current.B, steps.B, color.B, sec_color.B);
+    updV.R = calc_value(current.R, steps.R, color.R, sec_color.R, rise);
+    updV.G = calc_value(current.G, steps.G, color.G, sec_color.G, rise);
+    updV.B = calc_value(current.B, steps.B, color.B, sec_color.B, rise);
 
-    if (owerflow_check(updV))
+    if (owerflow_check(updV, steps, color, sec_color))
         rise = !rise;
 
     return updV;
 }
 
-int16_t LED::calc_value(int16_t val, int16_t step, int16_t min, int16_t max)
+int16_t LED::calc_value(int16_t val, int16_t step, int16_t min, int16_t max, bool &rise)
 {
     if (rise)
         val += step;
@@ -91,7 +105,7 @@ int16_t LED::calc_value(int16_t val, int16_t step, int16_t min, int16_t max)
     return val;
 }
 
-bool LED::owerflow_check(RGB val)
+bool LED::owerflow_check(RGB val, RGB steps, RGB color, RGB sec_color)
 {
     if (steps.R)
         if (val.R - steps.R < min(color.R, sec_color.R) || val.R + steps.R > max(color.R, sec_color.R))
@@ -139,7 +153,7 @@ void LED::switch_mode(Mode mode)
     _mode = mode;
 }
 
-void LED::stateOn()
+void LED::stateOn(RGB color)
 {
     switch_mode(ON);
     set_color(color);
@@ -148,7 +162,7 @@ void LED::stateOn()
 void LED::stateOff()
 {
     switch_mode(OFF);
-    set_color({0, 0, 0});
+    set_color(NONE);
 }
 
 void LED::stateBlink()
@@ -156,4 +170,52 @@ void LED::stateBlink()
     switch_mode(BLINK);
     steps = calculate_step(color, sec_color);
     set_color(sec_color);
+}
+
+void LED::ConstantLighting()
+{
+    stateOn(color);
+}
+
+void LED::CrossFade()
+{
+    //setup_color({1000,500,1000}, {0,1000,500}); //as variant for calibration
+    stateBlink();
+    loop(20);
+}
+
+void LED::Alarm()
+{
+    stateBlink();
+
+    led_ticker.attach_ms<LED *>(100, [](LED *led) {
+        if (led->rise)
+            led->set_color({1023, 0, 0});
+        else
+            led->set_color(NONE);
+
+        led->rise = !led->rise;
+    },
+                                this);
+
+    ticker_killer.once_ms<Ticker *>(3000, [](Ticker *t) { t->detach(); }, &led_ticker);
+}
+
+void LED::Off()
+{
+    stateOff();
+}
+
+void LED::Calibration()
+{
+}
+
+void LED::BlueBlink()
+{
+    setup_color({0, 0, 1024});
+    stateBlink();
+}
+
+void LED::SingleBlink()
+{
 }

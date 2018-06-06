@@ -5,6 +5,7 @@
  * @author Arseniy Churin
  * @date 2018-05-18
  */
+#include <Ticker.h>
 
 #ifndef LED_H_
 #define LED_H_
@@ -79,7 +80,7 @@ public:
    * @brief Main loop of led
    * 
    */
-  void loop();
+  void loop(uint16_t q);
 
   /**
    * @brief Setup color of lighting 
@@ -92,10 +93,48 @@ public:
   void setup_color(RGB first, RGB second = NONE);
 
   /**
+   * @brief Turns on constant indication
+   * 
+   * @param color 
+   */
+  void ConstantLighting();
+  /**
+   * @brief Cross fading between two colors
+   */
+  void CrossFade();
+  /**
+   * @brief Alarm indication
+   * 
+   * Red fast blinkig for 3 second
+   */
+  void Alarm();
+  /**
+   * @brief Turn off indication
+   * 
+   */
+  void Off();
+  /**
+   * @brief Rainbow indication while MPU calibrating
+   * 
+   */
+  void Calibration();
+  /**
+   * @brief Blue smooth blinking for search and bind states
+   * 
+   */
+  void BlueBlink();
+  /**
+   * @brief Single blink
+   * 
+   */
+  void SingleBlink();
+
+private:
+  /**
    * @brief Switch led state machine to ON state
    * 
    */
-  void stateOn();
+  void stateOn(RGB color);
   /**
    * @brief Switch led state machine to OFF state
    * 
@@ -107,7 +146,9 @@ public:
    */
   void stateBlink();
 
-private:
+  Ticker led_ticker;
+  Ticker ticker_killer;
+
   RGB color = NONE;
   RGB sec_color = NONE;
 
@@ -140,16 +181,21 @@ private:
    * @param max 
    * @return int16_t 
    */
-  int16_t calc_value(int16_t val, int16_t step, int16_t min, int16_t max);
+  static int16_t calc_value(int16_t val, int16_t step, int16_t min, int16_t max, bool &rise);
   /**
    * @brief Calculate values to all of colors
    * 
    * Calculate values for R, G and B led 
    * from one color to another based on steps and current colour
    * 
+   * @param current 
+   * @param steps 
+   * @param color 
+   * @param sec_color 
+   * @param rise 
    * @return RGB 
    */
-  RGB calculate_values();
+  static RGB calculate_values(RGB current, RGB steps, RGB color, RGB sec_color, bool &rise);
 
   /**
    * @brief Check color to owerflow
@@ -161,7 +207,7 @@ private:
    * @return true 
    * @return false 
    */
-  bool owerflow_check(RGB val);
+  static bool owerflow_check(RGB val, RGB steps, RGB color, RGB sec_color);
   /**
    * @brief Set color of RGB led
    * 

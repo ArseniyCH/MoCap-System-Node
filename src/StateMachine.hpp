@@ -14,9 +14,9 @@
 #include "MPU.h"
 #include "LED.h"
 #include "WebClient.h"
+//#include "Vibro.h"
 
 #include <Arduino.h>
-#include <Ticker.h>
 
 typedef enum
 {
@@ -31,10 +31,9 @@ typedef enum
 LED led = LED(13, 12, 14);
 WebClient wc = WebClient();
 MPU &mpu = MPU::Instance();
+//Vibro vibr = Vibro(8);
 
 State _state = Undef;
-
-static Ticker ledTicker;
 
 /**
  * @brief Set the State of StateMachine
@@ -87,11 +86,6 @@ void stateSearch()
   wc.websockets_connection();
 }
 
-void led_loop()
-{
-  led.loop();
-}
-
 /**
      * @brief Switch state machine to Bind state
      * 
@@ -99,7 +93,6 @@ void led_loop()
 void stateBind()
 {
   setState(Bind);
-  ledTicker.attach_ms(20, led_loop);
   if (wc.bind_connection())
     wc.websockets_connection();
   else
@@ -164,7 +157,6 @@ void disconnect()
 void color(int16_t r, int16_t g, int16_t b)
 {
   led.setup_color({r, g, b});
-  led.stateOn();
 }
 
 /**
@@ -175,10 +167,10 @@ void state_setup()
 {
   led.setup();
   led.setup_color({0, 0, 100});
-  led.stateBlink();
-  stateBind();
-
-  stateUndef();
+  led.CrossFade();
+  
+  //stateBind();
+  
   mpu.mpu_setup();
   mpu.disable();
 
@@ -200,7 +192,7 @@ String mac = String(WiFi.macAddress());
 void state_loop()
 {
   String q = mpu.mpu_loop();
-  wc.loop();
+  //wc.loop();
 
   switch (_state)
   {

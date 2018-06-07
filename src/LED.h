@@ -44,6 +44,7 @@ public:
   {
     OFF,
     BLINK,
+    S_BLINK,
     ON
   } Mode;
 
@@ -72,15 +73,10 @@ public:
   ~LED();
 
   /**
-   * @brief Led setup method
-   * 
-   */
-  void setup();
-  /**
    * @brief Main loop of led
    * 
    */
-  void loop(uint16_t q);
+  void smooth_blink(uint16_t frequency);
 
   /**
    * @brief Setup color of lighting 
@@ -97,11 +93,17 @@ public:
    * 
    * @param color 
    */
-  void ConstantLighting();
+
+  /**
+   * @brief 
+   * 
+   * @param color 
+   */
+  void ConstantLighting(RGB color);
   /**
    * @brief Cross fading between two colors
    */
-  void CrossFade();
+  void CrossFade(RGB first, RGB second);
   /**
    * @brief Alarm indication
    * 
@@ -109,7 +111,7 @@ public:
    */
   void Alarm();
   /**
-   * @brief Turn off indication
+   * @brief Switch led state machine to OFF state and turn off indication
    * 
    */
   void Off();
@@ -126,8 +128,9 @@ public:
   /**
    * @brief Single blink
    * 
+   * @param col 
    */
-  void SingleBlink();
+  void SingleBlink(RGB col);
 
 private:
   /**
@@ -135,22 +138,54 @@ private:
    * 
    */
   void stateOn(RGB color);
-  /**
-   * @brief Switch led state machine to OFF state
-   * 
-   */
-  void stateOff();
+
   /**
    * @brief Switch led state machine to BLINK state
    * 
    */
   void stateBlink();
 
+  /**
+   * @brief Switch led state machine to SINGLE BLINK state
+   * 
+   * @param col 
+   */
+  void stateSBlink(RGB col, RGB s_col = NONE);
+
+  /**
+   * @brief Detach led_ticker after milliseconds
+   * 
+   * @param milliseconds 
+   */
+  void killAfter(uint32_t milliseconds);
+
   Ticker led_ticker;
   Ticker ticker_killer;
 
   RGB color = NONE;
   RGB sec_color = NONE;
+
+  /**
+   * @brief Blink modes enum
+   * 
+   */
+  typedef enum
+  {
+    NaI,
+    CONSTANT,
+    CROSSFADE,
+    BLUEBLINK,
+    CALIBRATION
+  } InfiniteMode;
+
+  /**
+   * @brief previous state
+   * 
+   */
+  InfiniteMode _prevmode = NaI;
+  RGB _prev_f = NONE;
+  RGB _prev_s = NONE;
+  uint32_t _prev_fr = 0;
 
   uint8_t r, g, b;
 

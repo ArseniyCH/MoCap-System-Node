@@ -30,6 +30,5 @@ void setup()
  */
 void loop()
 {
-    Serial.println("main loop");
     state_loop();
 }

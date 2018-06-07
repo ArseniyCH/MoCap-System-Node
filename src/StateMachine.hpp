@@ -165,12 +165,11 @@ void color(int16_t r, int16_t g, int16_t b)
      */
 void state_setup()
 {
-  led.setup();
   led.setup_color({0, 0, 100});
-  led.CrossFade();
-  
-  //stateBind();
-  
+  //led.CrossFade();
+
+  //stateBind();;
+
   mpu.mpu_setup();
   mpu.disable();
 
@@ -191,6 +190,58 @@ String mac = String(WiFi.macAddress());
      */
 void state_loop()
 {
+  // ///
+  // ///
+  // ///
+  // String inString = "";
+  // while (Serial.available() > 0)
+  // {
+  //   int inChar = Serial.read();
+  //   if (inChar != '\n')
+  //     inString += (char)inChar;
+  // }
+
+  // if (!inString.equals(""))
+  // {
+  //   if (inString.equals("0"))
+  //   {
+  //     led.Alarm();
+  //   }
+  //   if (inString.equals("1"))
+  //   {
+  //     Serial.println(inString);
+  //     led.ConstantLighting({0, 1000, 0});
+  //   }
+  //   if (inString.equals("2"))
+  //   {
+  //     Serial.println(inString);
+  //     led.CrossFade({500, 0, 0}, {0, 0, 1000});
+  //   }
+  //   if (inString.equals("3"))
+  //   {
+  //     Serial.println(inString);
+  //     led.Off();
+  //   }
+  //   if (inString.equals("4"))
+  //   {
+  //     Serial.println(inString);
+  //     led.Calibration();
+  //   }
+  //   if (inString.equals("5"))
+  //   {
+  //     Serial.println(inString);
+  //     led.BlueBlink();
+  //   }
+  //   if (inString.equals("6"))
+  //   {
+  //     Serial.println(inString);
+  //     led.SingleBlink({55, 100, 400});
+  //   }
+  // }
+  // ///
+  // ///
+  // ///
+
   String q = mpu.mpu_loop();
   //wc.loop();
 
@@ -200,8 +251,8 @@ void state_loop()
     // state Undef loop logic
   case Bind:
     if (millis() - wc.bindStartTime > 30000)
-      stateSearch();
-    break;
+      // stateSearch();
+      break;
   case Calibration:
     // state Calibration loop logic
     break;
@@ -212,7 +263,7 @@ void state_loop()
   {
     if (!q.equals(""))
     {
-      wc.sendTXT(mac + ":" + q);
+      //wc.sendTXT(mac + ":" + q);
     }
 
     break;

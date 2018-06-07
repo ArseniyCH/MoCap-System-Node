@@ -36,11 +36,7 @@ LED::LED(uint8_t Rpin, uint8_t Gpin, uint8_t Bpin)
 
     b = Bpin;
     pinMode(Bpin, OUTPUT);
-    stateOff();
-}
-
-void LED::setup()
-{
+    Off();
 }
 
 void LED::setup_color(RGB first, RGB second)
@@ -49,22 +45,13 @@ void LED::setup_color(RGB first, RGB second)
     sec_color = second;
 }
 
-void LED::loop(uint16_t q)
+void LED::smooth_blink(uint16_t frequency)
 {
-    Serial.print("Hi!");
-    led_ticker.attach_ms<LED *>(q, [](LED *led) {
-        Serial.print("R: ");
-        Serial.println(led->current.R);
-        Serial.print("G: ");
-        Serial.println(led->current.G);
-        Serial.print("B: ");
-        Serial.println(led->current.B);
+    led_ticker.attach_ms<LED *>(frequency, [](LED *led) {
         led->current = calculate_values(led->current, led->steps, led->color, led->sec_color, led->rise);
         led->set_color(led->current);
     },
                                 this);
-
-    Serial.print("Hi!");
 }
 
 RGB LED::calculate_step(RGB prev, RGB end)
@@ -138,29 +125,29 @@ void LED::set_color(RGB col)
 
 void LED::switch_mode(Mode mode)
 {
-    switch (mode)
-    {
-    case (ON):
-        // state ON exit logic
-        break;
-    case (OFF):
-        // state OFF exit logic
-        break;
-    case (BLINK):
-        // state BLINK exit logic
-        break;
-    }
+    led_ticker.detach();
+    ticker_killer.detach();
+    rise = true;
     _mode = mode;
+
+    if (_prevmode != NaI && _mode != S_BLINK)
+    {
+        _prev_f = color;
+        _prev_s = sec_color;
+    }
 }
 
 void LED::stateOn(RGB color)
 {
+    setup_color(color);
     switch_mode(ON);
     set_color(color);
 }
 
-void LED::stateOff()
+void LED::Off()
 {
+    _prevmode = NaI;
+    setup_color(NONE);
     switch_mode(OFF);
     set_color(NONE);
 }
@@ -172,50 +159,93 @@ void LED::stateBlink()
     set_color(sec_color);
 }
 
-void LED::ConstantLighting()
+void LED::stateSBlink(RGB col, RGB s_col)
 {
+    switch_mode(S_BLINK);
+    setup_color(col);
+    steps = calculate_step(color, sec_color);
+    set_color(sec_color);
+}
+
+void LED::ConstantLighting(RGB color)
+{
+    _prevmode = CONSTANT;
     stateOn(color);
 }
 
-void LED::CrossFade()
+void LED::CrossFade(RGB first, RGB second)
 {
-    //setup_color({1000,500,1000}, {0,1000,500}); //as variant for calibration
+    _prevmode = CROSSFADE;
+    setup_color(first, second);
     stateBlink();
-    loop(20);
+    smooth_blink(40);
 }
 
 void LED::Alarm()
 {
-    stateBlink();
+    stateSBlink({1023, 0, 0}, NONE);
 
     led_ticker.attach_ms<LED *>(100, [](LED *led) {
         if (led->rise)
-            led->set_color({1023, 0, 0});
+            led->set_color(led->color);
         else
-            led->set_color(NONE);
+            led->set_color(led->sec_color);
 
         led->rise = !led->rise;
     },
                                 this);
 
-    ticker_killer.once_ms<Ticker *>(3000, [](Ticker *t) { t->detach(); }, &led_ticker);
-}
-
-void LED::Off()
-{
-    stateOff();
+    killAfter(3000);
 }
 
 void LED::Calibration()
 {
+    _prevmode = CALIBRATION;
+    setup_color({1000, 500, 1000}, {0, 1000, 500}); //as variant for calibration
+    stateBlink();
+    smooth_blink(23);
 }
 
 void LED::BlueBlink()
 {
+    _prevmode = BLUEBLINK;
     setup_color({0, 0, 1024});
     stateBlink();
+    smooth_blink(20);
 }
 
-void LED::SingleBlink()
+void LED::SingleBlink(RGB col)
 {
+    uint16_t fr = 30;
+    stateSBlink(col);
+    smooth_blink(fr);
+
+    killAfter(2 * fr * STEPS);
+}
+
+void LED::killAfter(uint32_t milliseconds)
+{
+    ticker_killer.attach_ms<LED *>(milliseconds, [](LED *led) {
+        led->led_ticker.detach();
+        switch (led->_prevmode)
+        {
+        case NaI:
+            led->Off();
+            return;
+            break;
+        case CONSTANT:
+            led->ConstantLighting(led->_prev_f);
+            break;
+        case CROSSFADE:
+            led->CrossFade(led->_prev_f, led->_prev_s);
+            break;
+        case BLUEBLINK:
+            led->BlueBlink();
+            break;
+        case CALIBRATION:
+            led->Calibration();
+            break;
+        }
+    },
+                                   this);
 }

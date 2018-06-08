@@ -19,8 +19,8 @@
 
 WebClient::WebClient()
 {
-    ReadString(0);
-    ssid = eRead;
+    //ReadString(0);
+    //ssid = "esp-async";
 }
 
 void WebClient::loop()
@@ -137,6 +137,11 @@ void WebClient::onConnect(Event event)
     _connect = event;
 }
 
+void WebClient::onWiFiConnect(Event event)
+{
+    _wificonnect = std::bind(event);
+}
+
 void WebClient::onDisconnect(Event event)
 {
     _disconnect = event;
@@ -174,13 +179,9 @@ void WebClient::wifi_connection()
 {
     bind = false;
     WiFi.mode(WIFI_STA);
+    WiFi.setAutoReconnect(true);
+    connectHandler = WiFi.onStationModeConnected(_wificonnect);
     WiFi.begin(ssid);
-
-    // while (WiFi.status() != WL_CONNECTED)
-    // {
-    //     delay(500);
-    //     Serial.print(".");
-    // }
 }
 
 bool WebClient::bind_connection()

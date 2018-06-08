@@ -15,11 +15,13 @@
 #include <WebSocketsClient.h>
 
 #include <WString.h>
+#include <Ticker.h>
 
 #define BIND_BIN (uint8_t *)"bndcheck", 8
 
 typedef std::function<void()> Event;
 typedef std::function<void(int16_t r, int16_t g, int16_t b)> ColorEvent;
+typedef std::function<void(const WiFiEventStationModeConnected &)> WiFiConnectedEvent;
 
 class WebClient
 {
@@ -118,6 +120,12 @@ public:
    */
   void onConnect(Event eventFunc);
   /**
+   * @brief Set handler for onWiFiConnect event
+   * 
+   * @param eventFunc
+   */
+  void onWiFiConnect(Event eventFunc);
+  /**
    * @brief Set handler for onDisconnect event 
    * 
    * @param eventFunc 
@@ -161,6 +169,8 @@ public:
   int32_t bindStartTime;
 
 private:
+  Ticker web_ticker;
+
   WebSocketsClient webSocket;
 
   /**
@@ -168,6 +178,14 @@ private:
    * 
    */
   void sendId();
+  /**
+   * @brief Find bridge after scan
+   * 
+   * @param n count of found networks 
+   */
+  std::function<void(int)> onScan;
+
+  void f(const WiFiEventStationModeConnected &);
 
   Event _bndevent;
   Event _startevent;
@@ -176,11 +194,13 @@ private:
   ColorEvent _changecolor;
 
   Event _connect;
+  WiFiConnectedEvent _wificonnect;
   Event _disconnect;
+  WiFiEventHandler connectHandler;
 
   int ssid_count;
 
-  char *ssid;
+  char *ssid = (char *)"esp-async";
   char *ip = (char *)"192.168.4.1";
   uint16_t port = 80;
   char *url = (char *)"\\ws";

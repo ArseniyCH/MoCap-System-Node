@@ -31,7 +31,7 @@ typedef enum
 LED led = LED(13, 12, 14);
 WebClient wc = WebClient();
 MPU &mpu = MPU::Instance();
-Vibro vibr = Vibro(8);
+Vibro vibr = Vibro(0);
 State _state = Undef;
 
 /**
@@ -82,7 +82,7 @@ void stateSearch()
 {
   setState(Search);
   wc.wifi_connection();
-  wc.websockets_connection();
+  //wc.websockets_connection();
 }
 
 /**
@@ -130,6 +130,15 @@ void stateActive()
 }
 
 /**
+ * @brief On wifi connect
+ * 
+ */
+void wifi_connect()
+{
+  wc.websockets_connection();
+}
+
+/**
      * @brief On ws connect
      * 
      */
@@ -164,14 +173,7 @@ void color(int16_t r, int16_t g, int16_t b)
      */
 void state_setup()
 {
-  led.setup_color({0, 0, 100});
-  //led.CrossFade();
-
-  //stateBind();;
-
-  mpu.mpu_setup();
-  mpu.disable();
-
+  wc.onWiFiConnect(wifi_connect);
   wc.onConnect(connect);
   wc.onDisconnect(disconnect);
   wc.onStart(stateActive);
@@ -179,6 +181,10 @@ void state_setup()
   wc.onBind(stateBind);
   wc.onCalibirate(stateCalibration);
   wc.onColor(color);
+  stateSearch();
+
+  mpu.mpu_setup();
+  mpu.disable();
 }
 
 String mac = String(WiFi.macAddress());
@@ -255,8 +261,8 @@ void state_loop()
     // state Undef loop logic
   case Bind:
     if (millis() - wc.bindStartTime > 30000)
-      // stateSearch();
-      break;
+      stateSearch();
+    break;
   case Calibration:
     // state Calibration loop logic
     break;

@@ -14,7 +14,7 @@
 #include "MPU.h"
 #include "LED.h"
 #include "WebClient.h"
-//#include "Vibro.h"
+#include "Vibro.h"
 
 #include <Arduino.h>
 
@@ -31,8 +31,7 @@ typedef enum
 LED led = LED(13, 12, 14);
 WebClient wc = WebClient();
 MPU &mpu = MPU::Instance();
-//Vibro vibr = Vibro(8);
-
+Vibro vibr = Vibro(8);
 State _state = Undef;
 
 /**
@@ -190,57 +189,62 @@ String mac = String(WiFi.macAddress());
      */
 void state_loop()
 {
-  // ///
-  // ///
-  // ///
-  // String inString = "";
-  // while (Serial.available() > 0)
-  // {
-  //   int inChar = Serial.read();
-  //   if (inChar != '\n')
-  //     inString += (char)inChar;
-  // }
+  ///
+  ///
+  ///
+  String inString = "";
+  while (Serial.available() > 0)
+  {
+    int inChar = Serial.read();
+    if (inChar != '\n')
+      inString += (char)inChar;
+  }
 
-  // if (!inString.equals(""))
-  // {
-  //   if (inString.equals("0"))
-  //   {
-  //     led.Alarm();
-  //   }
-  //   if (inString.equals("1"))
-  //   {
-  //     Serial.println(inString);
-  //     led.ConstantLighting({0, 1000, 0});
-  //   }
-  //   if (inString.equals("2"))
-  //   {
-  //     Serial.println(inString);
-  //     led.CrossFade({500, 0, 0}, {0, 0, 1000});
-  //   }
-  //   if (inString.equals("3"))
-  //   {
-  //     Serial.println(inString);
-  //     led.Off();
-  //   }
-  //   if (inString.equals("4"))
-  //   {
-  //     Serial.println(inString);
-  //     led.Calibration();
-  //   }
-  //   if (inString.equals("5"))
-  //   {
-  //     Serial.println(inString);
-  //     led.BlueBlink();
-  //   }
-  //   if (inString.equals("6"))
-  //   {
-  //     Serial.println(inString);
-  //     led.SingleBlink({55, 100, 400});
-  //   }
-  // }
-  // ///
-  // ///
-  // ///
+  if (!inString.equals(""))
+  {
+    if (inString.equals("0"))
+    {
+      led.Alarm();
+    }
+    if (inString.equals("1"))
+    {
+      Serial.println(inString);
+      led.ConstantLighting({0, 1000, 0});
+    }
+    if (inString.equals("2"))
+    {
+      Serial.println(inString);
+      led.CrossFade({500, 0, 0}, {0, 0, 1000});
+    }
+    if (inString.equals("3"))
+    {
+      Serial.println(inString);
+      led.Off();
+    }
+    if (inString.equals("4"))
+    {
+      Serial.println(inString);
+      led.Calibration();
+    }
+    if (inString.equals("5"))
+    {
+      Serial.println(inString);
+      led.BlueBlink();
+    }
+    if (inString.equals("6"))
+    {
+      Serial.println(inString);
+      led.SingleBlink({55, 100, 400});
+    }
+    if (inString.equals("7"))
+    {
+      Serial.println(inString);
+      vibr.AlarmVibration();
+    }
+  }
+  ///
+  ///
+  ///
 
   String q = mpu.mpu_loop();
   //wc.loop();

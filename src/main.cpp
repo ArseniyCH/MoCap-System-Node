@@ -17,10 +17,7 @@
 void setup()
 {
     Serial.begin(115200);
-    Serial.println("1");
     Serial.setDebugOutput(true);
-
-    Serial.println("2");
     state_setup();
 }
 

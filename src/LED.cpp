@@ -225,7 +225,7 @@ void LED::SingleBlink(RGB col)
 
 void LED::killAfter(uint32_t milliseconds)
 {
-    ticker_killer.attach_ms<LED *>(milliseconds, [](LED *led) {
+    ticker_killer.once_ms<LED *>(milliseconds, [](LED *led) {
         led->led_ticker.detach();
         switch (led->_prevmode)
         {
@@ -247,5 +247,5 @@ void LED::killAfter(uint32_t milliseconds)
             break;
         }
     },
-                                   this);
+                                 this);
 }

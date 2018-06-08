@@ -14,21 +14,64 @@ Vibro::Vibro(uint8_t pin)
 {
     _pin = pin;
     pinMode(pin, OUTPUT);
+    digitalWrite(pin, LOW);
 }
 
-void Vibro::vibrate()
+void Vibro::AlarmVibration()
 {
-    vibro(_pin, 100, off_tickers);
+    vibro_ticker.attach_ms<Vibro *>(100, [](Vibro *v) {
+        if (v->tumbler)
+            v->on();
+        else
+            v->off();
+
+        v->tumbler = !v->tumbler;
+    },
+                                    this);
+
+    killAfter(3000);
 }
 
-void Vibro::vibro(uint8_t pin, uint16_t delta, Ticker ticker[4])
+void Vibro::DoneVibration()
 {
-    uint16_t millis_counter = 0;
-    for (uint16_t i = 0; i < 4; i += 2)
-    {
-        ticker[i].once_ms<uint8_t>(millis_counter, [](uint8_t _pin) { digitalWrite(_pin, HIGH); }, pin);
-        millis_counter += delta;
-        ticker[i + 1].once_ms<uint8_t>(millis_counter, [](uint8_t _pin) { digitalWrite(_pin, LOW); }, pin);
-        millis_counter += delta;
-    }
+    vibro_ticker.attach_ms<Vibro *>(20, [](Vibro *v) {
+        if (v->tumbler)
+            v->on();
+        else
+            v->off();
+
+        v->tumbler = !v->tumbler;
+    },
+                                    this);
+
+    killAfter(1000);
+}
+
+void Vibro::SingleVibration(uint16_t power, uint16_t milliseconds)
+{
+    on(power);
+    vibro_ticker.attach_ms<Vibro *>(milliseconds, [](Vibro *v) {
+        v->off();
+    },
+                                    this);
+}
+
+void Vibro::on(uint16_t power)
+{
+    analogWrite(_pin, power);
+}
+
+void Vibro::off()
+{
+    digitalWrite(_pin, LOW);
+}
+
+void Vibro::killAfter(uint32_t milliseconds)
+{
+    ticker_killer.once_ms<Vibro *>(milliseconds, [](Vibro *v) {
+        v->vibro_ticker.detach();
+        v->off();
+        v->tumbler = true;
+    },
+                                   this);
 }

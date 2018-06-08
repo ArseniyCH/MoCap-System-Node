@@ -1,5 +1,5 @@
 /**
- * @brief 
+ * @brief Vibration manage class
  * 
  * @file Vibro.h
  * @author Arseniy Churin
@@ -14,16 +14,54 @@
 class Vibro
 {
 public:
+  /**
+   * @brief Construct a new Vibro object with specific pin
+   * 
+   * @param pin 
+   */
   Vibro(uint8_t pin);
 
-  void vibrate();
+  /**
+   * @brief Method to do alarm AlarmVibration
+   * 
+   * Pulse vibration for 3 sec.
+   * 
+   */
+  void AlarmVibration();
+  /**
+   * @brief Done Vibration
+   * 
+   */
+  void DoneVibration();
+  /**
+   * @brief Single Vibration
+   * 
+   */
+  void SingleVibration(uint16_t power = 1023, uint16_t milliseconds = 500);
 
 private:
-  static void vibro(uint8_t pin, uint16_t delta, Ticker ticker[4]);
+  /**
+   * @brief On vibro motor
+   * 
+   * @param power 
+   */
+  void on(uint16_t power = 1023);
+  /**
+   * @brief Off vibro motor
+   * 
+   */
+  void off();
+  /**
+   * @brief kill vibro_ticker after milliseconds
+   * 
+   * @param milliseconds 
+   */
+  void killAfter(uint32_t milliseconds);
 
-  Ticker a, b, c, d;
-  Ticker off_tickers[4] = {a, b, c, d};
+  Ticker vibro_ticker;
+  Ticker ticker_killer;
   uint8_t _pin;
+  bool tumbler = true;
 };
 
 #endif

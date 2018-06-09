@@ -22,6 +22,7 @@
 typedef std::function<void()> Event;
 typedef std::function<void(int16_t r, int16_t g, int16_t b)> ColorEvent;
 typedef std::function<void(const WiFiEventStationModeConnected &)> WiFiConnectedEvent;
+typedef std::function<void(const WiFiEventStationModeDisconnected &)> WiFiDisconnectedEvent;
 
 class WebClient
 {
@@ -119,12 +120,7 @@ public:
    * @param eventFunc 
    */
   void onConnect(Event eventFunc);
-  /**
-   * @brief Set handler for onWiFiConnect event
-   * 
-   * @param eventFunc
-   */
-  void onWiFiConnect(Event eventFunc);
+
   /**
    * @brief Set handler for onDisconnect event 
    * 
@@ -147,16 +143,10 @@ public:
   void sendTXT(String str);
 
   /**
-   * @brief Trying connect to WS server (Bridge)
+   * @brief Trying connect to Bridge AP (access point) and wc connection
    * 
    */
-  void websockets_connection();
-
-  /**
-   * @brief Trying connect to Bridge AP (access point)
-   * 
-   */
-  void wifi_connection();
+  void connect();
   /**
    * @brief Trying connect to Bridge AP (access point) in binding mode
    * 
@@ -177,15 +167,7 @@ private:
    * @brief Send mac address to ws server
    * 
    */
-  void sendId();
-  /**
-   * @brief Find bridge after scan
-   * 
-   * @param n count of found networks 
-   */
-  std::function<void(int)> onScan;
-
-  void f(const WiFiEventStationModeConnected &);
+  void sendMac();
 
   Event _bndevent;
   Event _startevent;
@@ -194,9 +176,16 @@ private:
   ColorEvent _changecolor;
 
   Event _connect;
-  WiFiConnectedEvent _wificonnect;
+  WiFiConnectedEvent _wificonnect = [](const WiFiEventStationModeConnected &) {};
   Event _disconnect;
+  WiFiDisconnectedEvent _wifidisconnect = [](const WiFiEventStationModeDisconnected &) {};
+  ;
+
   WiFiEventHandler connectHandler;
+  WiFiEventHandler disconnectHandler;
+
+  bool wifi_c = false;
+  bool ws_c = false;
 
   int ssid_count;
 

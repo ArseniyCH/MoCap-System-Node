@@ -44,11 +44,18 @@ void WebClient::webSocketEvent(WStype_t type, uint8_t *payload, size_t length)
     {
     case WStype_DISCONNECTED:
         USE_SERIAL.printf("[WSc] Disconnected!\n");
+        ws_c = false;
         _disconnect();
         break;
     case WStype_CONNECTED:
         USE_SERIAL.printf("[WSc] Connected to url: %s\n", payload);
+        ws_c = true;
         _connect();
+        //10 seconds whois timeout
+        web_ticker.once<WebClient *>(10, [](WebClient *wc) {
+            wc->webSocket.disconnect();
+        },
+                                     this);
         break;
     case WStype_TEXT:
     {
@@ -97,7 +104,10 @@ void WebClient::webSocketEvent(WStype_t type, uint8_t *payload, size_t length)
         if (strcmp("777", (char *)payload) == 0)
             _calibevent();
         if (strcmp("whois", (char *)payload) == 0)
-            sendId();
+        {
+            web_ticker.detach();
+            sendMac();
+        }
 
         break;
     }
@@ -137,13 +147,9 @@ void WebClient::onConnect(Event event)
     _connect = event;
 }
 
-void WebClient::onWiFiConnect(Event event)
-{
-    _wificonnect = std::bind(event);
-}
-
 void WebClient::onDisconnect(Event event)
 {
+    _wifidisconnect = std::bind(event);
     _disconnect = event;
 }
 
@@ -157,31 +163,38 @@ void WebClient::sendTXT(String str)
     webSocket.sendTXT(str);
 }
 
-void WebClient::sendId()
+void WebClient::sendMac()
 {
     sendTXT("id:" + WiFi.macAddress());
 }
 
-void WebClient::websockets_connection()
+void WebClient::connect()
 {
-    //webSocket.begin(ip, port, url);
-    webSocket.begin("192.168.4.1", 80, "/ws");
+    //WiFi connection
+    bind = false;
+    WiFi.mode(WIFI_STA);
+    WiFi.setAutoReconnect(true);
+    connectHandler = WiFi.onStationModeConnected([&](const WiFiEventStationModeConnected &e) {
+        wifi_c = true;
+        _wificonnect(e);
+    });
+    disconnectHandler = WiFi.onStationModeDisconnected([&](const WiFiEventStationModeDisconnected &e) {
+        if (wifi_c)
+        {
+            wifi_c = false;
+            ws_c = false;
+            _wifidisconnect(e);
+        }
+    });
+    WiFi.begin(ssid);
 
+    //WebSocet connection
+    webSocket.begin("192.168.4.1", 80, "/ws");
     webSocket.onEvent(std::bind(&WebClient::webSocketEvent, this,
                                 std::placeholders::_1,
                                 std::placeholders::_2,
                                 std::placeholders::_3));
-
-    webSocket.setReconnectInterval(5000);
-}
-
-void WebClient::wifi_connection()
-{
-    bind = false;
-    WiFi.mode(WIFI_STA);
-    WiFi.setAutoReconnect(true);
-    connectHandler = WiFi.onStationModeConnected(_wificonnect);
-    WiFi.begin(ssid);
+    webSocket.setReconnectInterval(3000);
 }
 
 bool WebClient::bind_connection()

@@ -41,23 +41,30 @@ State _state = Undef;
 */
 void setState(State state)
 {
-  switch (state)
+  switch (_state)
   {
   case Undef:
+    Serial.println("Exit from Undef state");
     // state Undef exit logic
+    break;
   case Bind:
+    Serial.println("Exit from Bind state");
     wc.onBind(NULL);
     break;
   case Calibration:
+    Serial.println("Exit from Calibration state");
     // state Calibration exit logic
     break;
   case Standby:
+    Serial.println("Exit from Standby state");
     // state Standby exit logic
     break;
   case Active:
+    Serial.println("Exit from Active state");
     mpu.disable();
     break;
   case Search:
+    Serial.println("Exit from Search state");
     // state Searching exit logic
     break;
   }
@@ -71,6 +78,7 @@ void setState(State state)
 void stateUndef()
 {
   setState(Undef);
+  Serial.println("Switch to Undef state");
   // State Undef enter logic
 }
 
@@ -81,8 +89,7 @@ void stateUndef()
 void stateSearch()
 {
   setState(Search);
-  wc.wifi_connection();
-  //wc.websockets_connection();
+  Serial.println("Switch to Search state");
 }
 
 /**
@@ -92,10 +99,11 @@ void stateSearch()
 void stateBind()
 {
   setState(Bind);
-  if (wc.bind_connection())
-    wc.websockets_connection();
-  else
-    stateSearch();
+  Serial.println("Switch to Search state");
+  // if (wc.bind_connection())
+  //   wc.websockets_connection();
+  // else
+  //   stateSearch();
 }
 
 /**
@@ -105,6 +113,7 @@ void stateBind()
 void stateCalibration()
 {
   setState(Calibration);
+  Serial.println("Switch to Search state");
   // State Calibration enter logic
 }
 
@@ -115,6 +124,7 @@ void stateCalibration()
 void stateStandby()
 {
   setState(Standby);
+  Serial.println("Switch to Search state");
   // State Standby enter logic
 }
 
@@ -125,17 +135,9 @@ void stateStandby()
 void stateActive()
 {
   setState(Active);
+  Serial.println("Switch to Search state");
   mpu.enable();
   // State Active enter logic
-}
-
-/**
- * @brief On wifi connect
- * 
- */
-void wifi_connect()
-{
-  wc.websockets_connection();
 }
 
 /**
@@ -144,6 +146,7 @@ void wifi_connect()
      */
 void connect()
 {
+  Serial.println("Connected!");
   stateStandby();
 }
 
@@ -153,6 +156,9 @@ void connect()
      */
 void disconnect()
 {
+  Serial.println("Disconnected((");
+  if (_state != Search)
+    stateSearch();
 }
 
 /**
@@ -173,7 +179,6 @@ void color(int16_t r, int16_t g, int16_t b)
      */
 void state_setup()
 {
-  wc.onWiFiConnect(wifi_connect);
   wc.onConnect(connect);
   wc.onDisconnect(disconnect);
   wc.onStart(stateActive);
@@ -181,10 +186,12 @@ void state_setup()
   wc.onBind(stateBind);
   wc.onCalibirate(stateCalibration);
   wc.onColor(color);
-  stateSearch();
 
   mpu.mpu_setup();
   mpu.disable();
+
+  wc.connect();
+  stateSearch();
 }
 
 String mac = String(WiFi.macAddress());

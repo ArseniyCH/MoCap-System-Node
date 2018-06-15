@@ -13,13 +13,6 @@
 #include <Arduino.h>
 #include <WString.h>
 
-const char *command;
-char eRead[25];
-byte len;
-bool byteRead;
-byte tray = 0;
-bool success = true;
-
 /**
  * @brief Write string in memory
  * 
@@ -28,17 +21,21 @@ bool success = true;
  * Other - content bytes
  * 
  * @param startAt Start address
- * @param id Char array content
+ * @param buf uint8_t array content
+ * @param len length of content
  */
-void SaveString(int startAt, const char *id)
+void SaveString(int startAt, const uint8_t *buf, uint8_t len)
 {
     EEPROM.begin(512);
-    EEPROM.write(startAt, strlen(id));
-    for (byte i = 0; i <= strlen(id); i++)
+    EEPROM.write(startAt, len);
+    for (byte i = 0; i < len; i++)
     {
-        EEPROM.write(i + startAt + 1, (uint8_t)id[i]);
+        EEPROM.write(i + startAt + 1, buf[i]);
     }
-    EEPROM.commit();
+    EEPROM.write(startAt + len + 1, 'o');
+    EEPROM.write(startAt + len + 2, 'k');
+
+    EEPROM.end();
 }
 
 /**
@@ -50,15 +47,31 @@ void SaveString(int startAt, const char *id)
  * 
  * @param startAt Start address
  */
-void ReadString(byte startAt)
+String ReadString(uint8_t startAt)
 {
+    String read = "";
     EEPROM.begin(512);
-    byte bufor = EEPROM.read(startAt);
-    for (byte i = 0; i <= bufor; i++)
+    uint8_t len = EEPROM.read(startAt);
+    for (uint8_t i = 0; i < len; i++)
     {
-        eRead[i] = (char)EEPROM.read(i + startAt + 1);
+        read += (char)EEPROM.read(i + startAt + 1);
     }
-    len = bufor;
+    String check = "";
+    check += (char)EEPROM.read(startAt + len + 1);
+    check += (char)EEPROM.read(startAt + len + 2);
+
+    EEPROM.end();
+
+    Serial.print("ssid from eeprom: ");
+    Serial.println(read);
+
+    Serial.print("check from eeprom: ");
+    Serial.println(check);
+
+    if (!check.equals("ok"))
+        return "";
+
+    return read;
 }
 
 /**
@@ -69,8 +82,9 @@ void ReadString(byte startAt)
  * @param startAt Address
  * @param val Value to write
  */
-void SaveByte(int startAt, byte val)
+void SaveByte(int startAt, uint8_t val)
 {
+    EEPROM.begin(512);
     EEPROM.write(startAt, val);
     EEPROM.commit();
 }
@@ -83,7 +97,7 @@ void SaveByte(int startAt, byte val)
  * @param startAt Address
  * @return byte 
  */
-byte ReadByte(byte startAt)
+uint8_t ReadByte(byte startAt)
 {
     EEPROM.begin(512);
     byte Read = -1;

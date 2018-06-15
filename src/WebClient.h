@@ -20,7 +20,7 @@
 #define BIND_BIN (uint8_t *)"bndcheck", 8
 
 typedef std::function<void()> Event;
-typedef std::function<void(int16_t r, int16_t g, int16_t b)> ColorEvent;
+typedef std::function<void(uint16_t (&f)[3], uint16_t (&s)[3])> ColorEvent;
 typedef std::function<void(const WiFiEventStationModeConnected &)> WiFiConnectedEvent;
 typedef std::function<void(const WiFiEventStationModeDisconnected &)> WiFiDisconnectedEvent;
 
@@ -31,18 +31,15 @@ public:
    * @brief Construct a new Web Client object
    * 
    */
-  WebClient();
+  WebClient(String bridge_id);
+
+  ~WebClient(){};
 
   /**
    * @brief WebClient setup method
    * 
    */
   void setup();
-  /**
-   * @brief WebClient loop method
-   * 
-   */
-  void loop();
 
   /**
    * @brief Check is Node to Bridge WiFi connected
@@ -112,7 +109,28 @@ public:
    * 
    * @param eventFunc 
    */
-  void onColor(std::function<void(int16_t r, int16_t g, int16_t b)> eventFunc);
+  void onColor(ColorEvent eventFunc);
+
+  /**
+   * @brief Set handler for onGetColor event 
+   * 
+   * @param eventFunc 
+   */
+  void onGetColor(Event eventFunc);
+
+  /**
+   * @brief Set handler for onVibro event 
+   * 
+   * @param eventFunc 
+   */
+  void onVibro(Event eventFunc);
+
+  /**
+   * @brief Set handler for onAlarm event  
+   * 
+   * @param eventFunc 
+   */
+  void onAlarm(Event eventFunc);
 
   /**
    * @brief Set handler for onConnect event 
@@ -169,12 +187,20 @@ private:
    */
   void sendMac();
 
+  /**
+   * @brief Send bridge ID to ws server
+   * 
+   */
+  void sendBridgeID();
+
   Event _bndevent;
   Event _startevent;
   Event _stopevent;
   Event _calibevent;
+  Event _alarmevent;
+  Event _vibroevent; //TODO: power and duration from bridge!
+  Event _getcolor;
   ColorEvent _changecolor;
-
   Event _connect;
   WiFiConnectedEvent _wificonnect = [](const WiFiEventStationModeConnected &) {};
   Event _disconnect;
@@ -189,7 +215,8 @@ private:
 
   int ssid_count;
 
-  char *ssid = (char *)"esp-async";
+  char ssid[25];
+  uint32_t b_id = 0;
   char *ip = (char *)"192.168.4.1";
   uint16_t port = 80;
   char *url = (char *)"\\ws";

@@ -15,6 +15,7 @@
 #include "LED.h"
 #include "WebClient.h"
 #include "Vibro.h"
+#include "EEPROM.hpp"
 
 #include <Arduino.h>
 
@@ -29,7 +30,7 @@ typedef enum
 } State;
 
 LED led = LED(13, 12, 14);
-WebClient wc = WebClient();
+WebClient wc = WebClient(ReadString(10));
 MPU &mpu = MPU::Instance();
 Vibro vibr = Vibro(0);
 State _state = Undef;
@@ -72,9 +73,9 @@ void setState(State state)
 }
 
 /**
-     * @brief Switch state machine to Undef state
-     * 
-     */
+ * @brief Switch state machine to Undef state
+ * 
+ */
 void stateUndef()
 {
   setState(Undef);
@@ -83,9 +84,9 @@ void stateUndef()
 }
 
 /**
-     * @brief Switch state machine to Search state
-     * 
-     */
+ * @brief Switch state machine to Search state
+ * 
+ */
 void stateSearch()
 {
   setState(Search);
@@ -93,11 +94,13 @@ void stateSearch()
 }
 
 /**
-     * @brief Switch state machine to Bind state
-     * 
-     */
+ * @brief Switch state machine to Bind state
+ * 
+ */
 void stateBind()
 {
+  if (_state != Undef && _state != Search)
+    return;
   setState(Bind);
   Serial.println("Switch to Search state");
   // if (wc.bind_connection())
@@ -107,20 +110,22 @@ void stateBind()
 }
 
 /**
-     * @brief Switch state machine to Calibration state
-     * 
-     */
+ * @brief Switch state machine to Calibration state
+ * 
+ */
 void stateCalibration()
 {
+  if (_state != Standby)
+    return;
   setState(Calibration);
   Serial.println("Switch to Search state");
   // State Calibration enter logic
 }
 
 /**
-     * @brief Switch state machine to Standby state
-     * 
-     */
+ * @brief Switch state machine to Standby state
+ * 
+ */
 void stateStandby()
 {
   setState(Standby);
@@ -129,11 +134,13 @@ void stateStandby()
 }
 
 /**
-     * @brief Switch state machine to Active state
-     * 
-     */
+ * @brief Switch state machine to Active state
+ * 
+ */
 void stateActive()
 {
+  if (_state != Standby)
+    return;
   setState(Active);
   Serial.println("Switch to Search state");
   mpu.enable();
@@ -141,9 +148,9 @@ void stateActive()
 }
 
 /**
-     * @brief On ws connect
-     * 
-     */
+ * @brief On ws connect
+ * 
+ */
 void connect()
 {
   Serial.println("Connected!");
@@ -151,9 +158,9 @@ void connect()
 }
 
 /**
-     * @brief On ws disconnect
-     * 
-     */
+ * @brief On ws disconnect
+ * 
+ */
 void disconnect()
 {
   Serial.println("Disconnected((");
@@ -162,21 +169,38 @@ void disconnect()
 }
 
 /**
-     * @brief Led on with color
-     * 
-     * @param r 
-     * @param g 
-     * @param b 
-     */
-void color(int16_t r, int16_t g, int16_t b)
+ * @brief Led on with color
+ * 
+ * @param f First color
+ * @param s Second color 
+ */
+void color(uint16_t (&f)[3], uint16_t (&s)[3])
 {
-  led.setup_color({r, g, b});
+  led.setup_color({f[0], f[1], f[2]}, {s[0], s[1], s[2]});
+}
+
+void sendColor()
+{
+  //TODO: Get color from EEPROM and send it to bridge
+}
+
+void vibroResponse()
+{
+  if (_state != Standby && _state != Active)
+    return;
+  vibr.SingleVibration();
+}
+
+void Alarm()
+{
+  led.Alarm();
+  vibr.AlarmVibration();
 }
 
 /**
-     * @brief State machine setup method
-     * 
-     */
+ * @brief State machine setup method
+ * 
+ */
 void state_setup()
 {
   wc.onConnect(connect);
@@ -186,6 +210,9 @@ void state_setup()
   wc.onBind(stateBind);
   wc.onCalibirate(stateCalibration);
   wc.onColor(color);
+  wc.onGetColor(sendColor);
+  wc.onVibro(vibroResponse);
+  wc.onAlarm(Alarm);
 
   mpu.mpu_setup();
   mpu.disable();
@@ -197,9 +224,9 @@ void state_setup()
 String mac = String(WiFi.macAddress());
 
 /**
-     * @brief State machine loop method
-     * 
-     */
+ * @brief State machine loop method
+ * 
+ */
 void state_loop()
 {
   ///
@@ -260,15 +287,14 @@ void state_loop()
   ///
 
   String q = mpu.mpu_loop();
-  //wc.loop();
 
   switch (_state)
   {
   case Undef:
     // state Undef loop logic
   case Bind:
-    if (millis() - wc.bindStartTime > 30000)
-      stateSearch();
+    // if (millis() - wc.bindStartTime > 30000)
+    //   stateSearch();
     break;
   case Calibration:
     // state Calibration loop logic

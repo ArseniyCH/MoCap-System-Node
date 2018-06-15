@@ -13,19 +13,15 @@
 
 #include <WString.h>
 #include <Arduino.h>
-#include "EEPROM.hpp"
 
 #define USE_SERIAL Serial
 
-WebClient::WebClient()
+WebClient::WebClient(String bridge_id)
 {
-    //ReadString(0);
-    //ssid = "esp-async";
-}
-
-void WebClient::loop()
-{
-    webSocket.loop();
+    b_id = bridge_id.toInt();
+    if (!bridge_id.length())
+        bridge_id = "0";
+    strcpy(ssid, ("mcs_" + bridge_id).c_str());
 }
 
 bool WebClient::isConnected()
@@ -51,22 +47,22 @@ void WebClient::webSocketEvent(WStype_t type, uint8_t *payload, size_t length)
         USE_SERIAL.printf("[WSc] Connected to url: %s\n", payload);
         ws_c = true;
         _connect();
-        //10 seconds whois timeout
-        web_ticker.once<WebClient *>(10, [](WebClient *wc) {
-            wc->webSocket.disconnect();
-        },
-                                     this);
+        // //10 seconds whois timeout
+        // web_ticker.once<WebClient *>(10, [](WebClient *wc) {
+        //     wc->webSocket.disconnect();
+        // },
+        //                             this);
         break;
     case WStype_TEXT:
     {
         USE_SERIAL.printf("[WSc] get text: %s\n", payload);
 
         /*
-*007 - bind_accept
-*101 - start command
-*010 - stop command
-*777 - calibiration command
-*/
+        *007 - bind_accept
+        *101 - start command
+        *010 - stop command
+        *777 - calibiration command
+        */
         if (strchr((char *)payload, ',') != NULL)
         {
             char buf[strlen((char *)payload)];
@@ -83,14 +79,15 @@ void WebClient::webSocketEvent(WStype_t type, uint8_t *payload, size_t length)
 
             if (i = 3)
             {
-                Serial.print("Parse RGB: { ");
-                Serial.print(rgb[0]);
-                Serial.print(", ");
-                Serial.print(rgb[1]);
-                Serial.print(", ");
-                Serial.print(rgb[2]);
-                Serial.println("};");
-                _changecolor(rgb[0], rgb[1], rgb[2]);
+                // Serial.print("Parse RGB: { ");
+                // Serial.print(rgb[0]);
+                // Serial.print(", ");
+                // Serial.print(rgb[1]);
+                // Serial.print(", ");
+                // Serial.print(rgb[2]);
+                // Serial.println("};");
+                // uint16_t s[3]{0, 0, 0};
+                // _changecolor(rgb, s);
             }
         }
 
@@ -105,7 +102,7 @@ void WebClient::webSocketEvent(WStype_t type, uint8_t *payload, size_t length)
             _calibevent();
         if (strcmp("whois", (char *)payload) == 0)
         {
-            web_ticker.detach();
+            // web_ticker.detach();
             sendMac();
         }
 
@@ -114,6 +111,57 @@ void WebClient::webSocketEvent(WStype_t type, uint8_t *payload, size_t length)
     case WStype_BIN:
         USE_SERIAL.printf("[WSc] get binary length: %u\n", length);
         hexdump(payload, length);
+
+        switch (payload[0])
+        {
+        //Calibration command
+        case 0x64:
+            if (_calibevent)
+                _calibevent();
+            break;
+        //Vibration command
+        case 0x5A:
+            if (_vibroevent)
+                _vibroevent();
+            break;
+        //Start MoCap command
+        case 0xB:
+            if (_startevent)
+                _startevent();
+            break;
+        //Stop MoCap command
+        case 0xC:
+            if (_stopevent)
+                _stopevent();
+            break;
+        //Get LED colors command
+        case 0x50:
+            if (_getcolor)
+                _getcolor();
+            break;
+        //Set LED colors command
+        case 0x51:
+            if (_changecolor)
+            {
+                uint16_t f[3]{payload[1], payload[2], payload[3]};
+                uint16_t s[3]{0, 0, 0};
+                _changecolor(f, s);
+            }
+            break;
+        //Alarm command
+        case 0x59:
+            if (_alarmevent)
+                _alarmevent();
+            break;
+        //Get bridge ID command
+        case 0x14:
+            sendBridgeID();
+            break;
+        //Get MAC command
+        case 0x15:
+            sendMac();
+            break;
+        }
     }
 }
 
@@ -142,6 +190,21 @@ void WebClient::onColor(ColorEvent event)
     _changecolor = event;
 }
 
+void WebClient::onGetColor(Event event)
+{
+    _getcolor = event;
+}
+
+void WebClient::onVibro(Event event)
+{
+    _vibroevent = event;
+}
+
+void WebClient::onAlarm(Event event)
+{
+    _alarmevent = event;
+}
+
 void WebClient::onConnect(Event event)
 {
     _connect = event;
@@ -165,11 +228,21 @@ void WebClient::sendTXT(String str)
 
 void WebClient::sendMac()
 {
-    sendTXT("id:" + WiFi.macAddress());
+    uint8_t *buf;
+    sendBin(WiFi.macAddress(buf), 6);
+}
+
+void WebClient::sendBridgeID()
+{
+    uint8_t buf[4];
+    *(uint32_t *)buf = b_id;
+    sendBin(buf, 4);
 }
 
 void WebClient::connect()
 {
+    Serial.print("Connecting to ");
+    Serial.print(ssid);
     //WiFi connection
     bind = false;
     WiFi.mode(WIFI_STA);
@@ -189,7 +262,7 @@ void WebClient::connect()
     WiFi.begin(ssid);
 
     //WebSocet connection
-    webSocket.begin("192.168.4.1", 80, "/ws");
+    webSocket.begin(ip, port, url);
     webSocket.onEvent(std::bind(&WebClient::webSocketEvent, this,
                                 std::placeholders::_1,
                                 std::placeholders::_2,

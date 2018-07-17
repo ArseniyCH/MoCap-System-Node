@@ -142,7 +142,7 @@ void stateActive()
   if (_state != Standby)
     return;
   setState(Active);
-  Serial.println("Switch to Search state");
+  Serial.println("Switch to Active state");
   mpu.enable();
   // State Active enter logic
 }
@@ -154,6 +154,7 @@ void stateActive()
 void connect()
 {
   Serial.println("Connected!");
+  led.CrossFade({500, 0, 0}, {0, 0, 1000});
   stateStandby();
 }
 
@@ -165,7 +166,10 @@ void disconnect()
 {
   Serial.println("Disconnected((");
   if (_state != Search)
+  {
+    led.BlueBlink();
     stateSearch();
+  }
 }
 
 /**
@@ -203,6 +207,7 @@ void Alarm()
  */
 void state_setup()
 {
+  led.BlueBlink();
   wc.onConnect(connect);
   wc.onDisconnect(disconnect);
   wc.onStart(stateActive);
@@ -229,6 +234,7 @@ String mac = String(WiFi.macAddress());
  */
 void state_loop()
 {
+  wc.loop();
   ///
   ///
   ///
@@ -254,7 +260,7 @@ void state_loop()
     if (inString.equals("2"))
     {
       Serial.println(inString);
-      led.CrossFade({500, 0, 0}, {0, 0, 1000});
+      led.CrossFade({1000, 0, 0}, {0, 0, 1000});
     }
     if (inString.equals("3"))
     {
@@ -306,7 +312,7 @@ void state_loop()
   {
     if (!q.equals(""))
     {
-      //wc.sendTXT(mac + ":" + q);
+      wc.sendTXT(mac + ":" + q);
     }
 
     break;

@@ -111,6 +111,16 @@ void WebClient::webSocketEvent(WStype_t type, uint8_t *payload, size_t length)
     case WStype_BIN:
         USE_SERIAL.printf("[WSc] get binary length: %u\n", length);
         hexdump(payload, length);
+        Serial.print("Get binary; length: ");
+        Serial.println(length);
+        Serial.print("content :");
+        for (int i = 0; i < length; ++i)
+        {
+            Serial.print(i);
+            Serial.print(": ");
+            Serial.print(payload[i]);
+            Serial.println();
+        }
 
         switch (payload[0])
         {
@@ -143,8 +153,16 @@ void WebClient::webSocketEvent(WStype_t type, uint8_t *payload, size_t length)
         case 0x51:
             if (_changecolor)
             {
-                uint16_t f[3]{payload[1], payload[2], payload[3]};
-                uint16_t s[3]{0, 0, 0};
+                uint16_t f[3] = {0, 0, 0};
+                uint16_t s[3] = {0, 0, 0};
+
+                if (length > 3)
+                    uint16_t f[3] = {payload[1], payload[2], payload[3]};
+                else
+                    break;
+
+                if (length > 5)
+                    uint16_t s[3] = {payload[4], payload[5], payload[6]};
                 _changecolor(f, s);
             }
             break;
@@ -228,8 +246,9 @@ void WebClient::sendTXT(String str)
 
 void WebClient::sendMac()
 {
-    uint8_t *buf;
-    sendBin(WiFi.macAddress(buf), 6);
+    uint8_t buf[6];
+    WiFi.macAddress(buf);
+    sendBin(buf, 6);
 }
 
 void WebClient::sendBridgeID()
@@ -245,6 +264,7 @@ void WebClient::connect()
     Serial.print(ssid);
     //WiFi connection
     bind = false;
+    WiFi.disconnect();
     WiFi.mode(WIFI_STA);
     WiFi.setAutoReconnect(true);
     connectHandler = WiFi.onStationModeConnected([&](const WiFiEventStationModeConnected &e) {
@@ -262,12 +282,13 @@ void WebClient::connect()
     WiFi.begin(ssid);
 
     //WebSocet connection
-    webSocket.begin(ip, port, url);
+    //webSocket.begin(ip, port, url);
+    webSocket.begin("192.168.4.1", 80, "/ws");
     webSocket.onEvent(std::bind(&WebClient::webSocketEvent, this,
                                 std::placeholders::_1,
                                 std::placeholders::_2,
                                 std::placeholders::_3));
-    webSocket.setReconnectInterval(3000);
+    webSocket.setReconnectInterval(5000);
 }
 
 bool WebClient::bind_connection()

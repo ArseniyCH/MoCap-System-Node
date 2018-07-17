@@ -41,6 +41,18 @@ public:
    */
   void setup();
 
+  void loop()
+  {
+    if (WiFi.status() == WL_CONNECTED)
+    {
+      webSocket.loop();
+    }
+    else
+    {
+      webSocket.disconnect();
+    }
+  }
+
   /**
    * @brief Check is Node to Bridge WiFi connected
    * 

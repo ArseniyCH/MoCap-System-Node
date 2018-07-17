@@ -77,7 +77,9 @@ RGB LED::calculate_values(RGB current, RGB steps, RGB color, RGB sec_color, bool
     updV.B = calc_value(current.B, steps.B, color.B, sec_color.B, rise);
 
     if (owerflow_check(updV, steps, color, sec_color))
+    {
         rise = !rise;
+    }
 
     return updV;
 }
@@ -118,9 +120,12 @@ bool LED::owerflow_check(RGB val, RGB steps, RGB color, RGB sec_color)
 void LED::set_color(RGB col)
 {
     current = col;
-    analogWrite(r, 1023 - col.R);
-    analogWrite(g, 1023 - col.G);
-    analogWrite(b, 1023 - col.B);
+    if (col.R >= 0)
+        analogWrite(r, 1023 - col.R);
+    if (col.G >= 0)
+        analogWrite(g, 1023 - col.G);
+    if (col.B >= 0)
+        analogWrite(b, 1023 - col.B);
 }
 
 void LED::switch_mode(Mode mode)
@@ -178,7 +183,7 @@ void LED::CrossFade(RGB first, RGB second)
     _prevmode = CROSSFADE;
     setup_color(first, second);
     stateBlink();
-    smooth_blink(40);
+    smooth_blink(25);
 }
 
 void LED::Alarm()

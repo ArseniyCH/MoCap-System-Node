@@ -186,6 +186,11 @@ void LED::CrossFade(RGB first, RGB second)
     smooth_blink(25);
 }
 
+void LED::CrossFade(uint16_t colors[16])
+{
+    CrossFade({colors[0], colors[1], colors[2]}, {colors[3], colors[4], colors[5]});
+}
+
 void LED::Alarm()
 {
     stateSBlink({1023, 0, 0}, NONE);

@@ -100,10 +100,17 @@ public:
    * @param color 
    */
   void ConstantLighting(RGB color);
+
   /**
    * @brief Cross fading between two colors
    */
-  void CrossFade(RGB first, RGB second);
+  void CrossFade(RGB first, RGB second = {0, 0, 0});
+
+  /**
+   * @brief Cross fading between two colors
+   */
+  void CrossFade(uint16_t colors[6]);
+
   /**
    * @brief Alarm indication
    * 

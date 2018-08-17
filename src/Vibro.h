@@ -19,7 +19,7 @@ public:
    * 
    * @param pin 
    */
-  Vibro(uint8_t pin);
+  Vibro(uint8_t pin, uint8_t gnd_pin);
 
   /**
    * @brief Method to do alarm AlarmVibration

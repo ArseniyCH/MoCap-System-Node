@@ -9,9 +9,13 @@
 #ifndef EEPROM_HPP
 #define EEPROM_HPP
 
+#define COLOR_ADDRESS 100
+
 #include <EEPROM.h>
 #include <Arduino.h>
 #include <WString.h>
+
+const uint8_t color_size = 3;
 
 /**
  * @brief Write string in memory
@@ -141,6 +145,57 @@ int ReadInt(int addr)
         raw[i] = EEPROM.read(addr + i);
     int &num = (int &)raw;
     return num;
+}
+
+bool WriteRGB(uint8_t *buf, uint16_t address)
+{
+    EEPROM.begin(512);
+
+    for (int i = 0; i < color_size * 2; ++i)
+    {
+        EEPROM.write(address++, buf[i]);
+    }
+
+    EEPROM.write(address + color_size * 2, 'o');
+    EEPROM.write(address + color_size * 2 + 1, 'k');
+
+    EEPROM.commit();
+}
+
+void ReadRGB(uint8_t *buf, uint16_t address)
+{
+    EEPROM.begin(512);
+
+    int16_t check = ReadInt(address + color_size * 2);
+    if (check != 2300)
+    {
+        memset(buf, 0, color_size * 2);
+        buf[2] = 0xFF;
+        WriteRGB(buf, address);
+        EEPROM.end();
+        return;
+    }
+
+    for (int i = 0; i < color_size * 2; ++i)
+    {
+        buf[i] = EEPROM.read(address++);
+    }
+
+    EEPROM.end();
+
+    return;
+}
+
+void ReadMappedRGB(uint16_t *buf, uint16_t address)
+{
+    uint8_t *pre = new uint8_t[color_size * 2];
+    ReadRGB(pre, address);
+    for (int i = 0; i < color_size * 2; ++i)
+    {
+        buf[i] = pre[i] * 4;
+    }
+
+    delete[] pre;
 }
 
 #endif

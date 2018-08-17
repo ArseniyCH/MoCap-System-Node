@@ -19,6 +19,12 @@
 
 #define BIND_BIN (uint8_t *)"bndcheck", 8
 
+//Command defines
+#define MPU_DATA 0xA
+#define COLORS 0x50
+#define BRIDGE_ID 0x14
+#define CALIBRATION_OFFSET 0x64
+
 typedef std::function<void()> Event;
 typedef std::function<void(uint16_t (&f)[3], uint16_t (&s)[3])> ColorEvent;
 typedef std::function<void(const WiFiEventStationModeConnected &)> WiFiConnectedEvent;
@@ -164,7 +170,7 @@ public:
    * @param buf 
    * @param length 
    */
-  void sendBin(uint8_t *buf, size_t length);
+  void sendBin(uint8_t *buf, size_t length, uint8_t command = 0x00);
   /**
    * @brief Send text data to WS server (Bridge)
    * 
@@ -228,6 +234,7 @@ private:
   int ssid_count;
 
   char ssid[25];
+
   uint32_t b_id = 0;
   char *ip = (char *)"192.168.4.1";
   uint16_t port = 80;

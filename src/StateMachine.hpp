@@ -32,7 +32,7 @@ typedef enum
 LED led = LED(13, 12, 14);
 WebClient wc = WebClient(ReadString(10));
 MPU &mpu = MPU::Instance();
-Vibro vibr = Vibro(0);
+Vibro vibr = Vibro(2, 0);
 State _state = Undef;
 
 /**
@@ -42,6 +42,9 @@ State _state = Undef;
 */
 void setState(State state)
 {
+  if (state == _state)
+    return;
+
   switch (_state)
   {
   case Undef:
@@ -129,7 +132,7 @@ void stateCalibration()
 void stateStandby()
 {
   setState(Standby);
-  Serial.println("Switch to Search state");
+  Serial.println("Switch to Standby state");
   // State Standby enter logic
 }
 
@@ -154,7 +157,9 @@ void stateActive()
 void connect()
 {
   Serial.println("Connected!");
-  led.CrossFade({500, 0, 0}, {0, 0, 1000});
+  uint16_t col[6];
+  ReadMappedRGB(col, COLOR_ADDRESS);
+  led.CrossFade(col);
   stateStandby();
 }
 
@@ -185,13 +190,14 @@ void color(uint16_t (&f)[3], uint16_t (&s)[3])
 
 void sendColor()
 {
-  //TODO: Get color from EEPROM and send it to bridge
+  uint8_t colors[6];
+  ReadRGB(colors, 100);
+
+  wc.sendBin(colors, 6, COLORS);
 }
 
 void vibroResponse()
 {
-  if (_state != Standby && _state != Active)
-    return;
   vibr.SingleVibration();
 }
 
@@ -227,6 +233,8 @@ void state_setup()
 }
 
 String mac = String(WiFi.macAddress());
+
+uint8_t *quat = new uint8_t[4 * sizeof(float)];
 
 /**
  * @brief State machine loop method
@@ -292,7 +300,7 @@ void state_loop()
   ///
   ///
 
-  String q = mpu.mpu_loop();
+  mpu.mpu_loop(quat);
 
   switch (_state)
   {
@@ -310,11 +318,8 @@ void state_loop()
     break;
   case Active:
   {
-    if (!q.equals(""))
-    {
-      wc.sendTXT(mac + ":" + q);
-    }
-
+    if (quat)
+      wc.sendBin(quat, 4 * sizeof(float), MPU_DATA);
     break;
   }
   case Search:

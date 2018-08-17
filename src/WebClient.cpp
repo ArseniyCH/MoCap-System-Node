@@ -234,9 +234,21 @@ void WebClient::onDisconnect(Event event)
     _disconnect = event;
 }
 
-void WebClient::sendBin(uint8_t *buf, size_t length)
+void WebClient::sendBin(uint8_t *buf, size_t length, uint8_t command)
 {
-    webSocket.sendBIN(buf, length);
+    if (!command)
+    {
+        webSocket.sendBIN(buf, length);
+        return;
+    }
+
+    uint8_t *b = new uint8_t[length + 1];
+
+    b[0] = command;
+    memcpy(b + 1, buf, length);
+
+    webSocket.sendBIN(b, length + 1);
+    delete[] b;
 }
 
 void WebClient::sendTXT(String str)
@@ -297,14 +309,14 @@ bool WebClient::bind_connection()
     WiFi.disconnect();
 
     int n = WiFi.scanNetworks(false, true);
-
+    String ssid = "";
     for (int i = 0; i < n; ++i)
     {
-        if (WiFi.SSID(i).equals("mcsbnd"))
+        ssid = WiFi.SSID(i);
+        if (ssid.startsWith("mcsbnd"))
         {
             bind = true;
-            bindStartTime = millis();
-            WiFi.begin("mcsbnd");
+            WiFi.begin(ssid.c_str());
             return true;
         }
     }

@@ -10,11 +10,13 @@
 #include <Arduino.h>
 #include <Ticker.h>
 
-Vibro::Vibro(uint8_t pin)
+Vibro::Vibro(uint8_t pin, uint8_t gnd_pin)
 {
     _pin = pin;
     pinMode(pin, OUTPUT);
     digitalWrite(pin, LOW);
+        pinMode(gnd_pin, OUTPUT);
+    digitalWrite(gnd_pin, LOW);
 }
 
 void Vibro::AlarmVibration()

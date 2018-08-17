@@ -117,17 +117,17 @@ void MPU::mpu_setup()
     }
 }
 
-String MPU::mpu_loop()
+void MPU::mpu_loop(uint8_t *quat)
 {
-    if(!enabled)
-        return"";
+    if (!enabled)
+        return;
     // if programming failed, don't try to do anything
     if (!dmpReady)
-        return "";
+        return;
 
     // wait for MPU interrupt or extra packet(s) available
     if (!mpuInterrupt && fifoCount < packetSize)
-        return "";
+        return;
 
     // reset interrupt flag and get INT_STATUS byte
     mpuInterrupt = false;
@@ -160,19 +160,14 @@ String MPU::mpu_loop()
 
         // display quaternion values in easy matrix form: w x y z
         _mpu.dmpGetQuaternion(&q, fifoBuffer);
-        //webSocket.sendTXT("quat\t" + (String)q.w + "\t" + (String)q.x + "\t" + (String)q.y + "\t" + (String)q.z);
+        // uint8_t *w = (uint8_t *)&q.w,
+        //         *x = (uint8_t *)&q.x,
+        //         *y = (uint8_t *)&q.y,
+        //         *z = (uint8_t *)&q.z;
 
-        String out_quat = "";
-        out_quat += q.w;
-        out_quat += "\t";
-        out_quat += q.x;
-        out_quat += "\t";
-        out_quat += q.y;
-        out_quat += "\t";
-        out_quat += q.z;
-
-        return out_quat;
+        memcpy(quat, &q.w, sizeof(float));
+        memcpy(quat + sizeof(float), &q.x, sizeof(float));
+        memcpy(quat + 2 * sizeof(float), &q.y, sizeof(float));
+        memcpy(quat + 3 * sizeof(float), &q.z, sizeof(float));
     }
-
-    return "";
 }

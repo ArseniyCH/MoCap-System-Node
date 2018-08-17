@@ -27,10 +27,9 @@ public:
   void mpu_setup();
   /**
    * @brief Loop of MPU
-   * 
-   * @return String 
+   *  
    */
-  String mpu_loop();
+  void mpu_loop(uint8_t *quat);
 
   /**
    * @brief Calibration of MPU

@@ -9,6 +9,8 @@
 #ifndef STATEMACHINE_H
 #define STATEMACHINE_H
 
+#define DEV_MODE
+
 #include <WString.h>
 
 #include "MPU.h"
@@ -18,6 +20,8 @@
 #include "EEPROM.hpp"
 
 #include <Arduino.h>
+
+#include <Ticker.h>
 
 typedef enum
 {
@@ -31,9 +35,12 @@ typedef enum
 
 LED led = LED(13, 12, 14);
 WebClient wc = WebClient(ReadString(10));
+
 MPU &mpu = MPU::Instance();
-Vibro vibr = Vibro(2, 0);
+Vibro vibr = Vibro(4);
 State _state = Undef;
+
+Ticker MPU_ticker;
 
 /**
  * @brief Set the State of StateMachine
@@ -53,7 +60,7 @@ void setState(State state)
     break;
   case Bind:
     Serial.println("Exit from Bind state");
-    wc.onBind(NULL);
+    wc.onBind(nullptr);
     break;
   case Calibration:
     Serial.println("Exit from Calibration state");
@@ -65,6 +72,9 @@ void setState(State state)
     break;
   case Active:
     Serial.println("Exit from Active state");
+#ifdef DEV_MODE
+    MPU_ticker.detach();
+#endif
     mpu.disable();
     break;
   case Search:
@@ -104,8 +114,9 @@ void stateBind()
 {
   if (_state != Undef && _state != Search)
     return;
+
   setState(Bind);
-  Serial.println("Switch to Search state");
+  Serial.println("Switch to Bind state");
   // if (wc.bind_connection())
   //   wc.websockets_connection();
   // else
@@ -147,6 +158,13 @@ void stateActive()
   setState(Active);
   Serial.println("Switch to Active state");
   mpu.enable();
+#ifdef DEV_MODE
+  MPU_ticker.attach_ms<WebClient *>(50, [](WebClient *wc) {
+    uint8_t *quat = (uint8_t *)"0000000000000000";
+    wc->sendBin(quat, 4 * sizeof(float), MPU_DATA);
+  },
+                                    &wc);
+#endif
   // State Active enter logic
 }
 
@@ -183,8 +201,9 @@ void disconnect()
  * @param f First color
  * @param s Second color 
  */
-void color(uint16_t (&f)[3], uint16_t (&s)[3])
+void changeColor(uint16_t (&f)[3], uint16_t (&s)[3])
 {
+  WriteRGB({}, 100);
   led.setup_color({f[0], f[1], f[2]}, {s[0], s[1], s[2]});
 }
 
@@ -196,15 +215,24 @@ void sendColor()
   wc.sendBin(colors, 6, COLORS);
 }
 
-void vibroResponse()
+void vibroResponse(uint16_t seconds)
 {
-  vibr.SingleVibration();
+  if (seconds == 0)
+    seconds = 1;
+  if (seconds > 10)
+    seconds = 10;
+  vibr.SingleVibration(1000 * seconds);
 }
 
 void Alarm()
 {
   led.Alarm();
   vibr.AlarmVibration();
+}
+
+void changeSSID(String ssid)
+{
+  //TODO: write function body!
 }
 
 /**
@@ -219,17 +247,25 @@ void state_setup()
   wc.onStart(stateActive);
   wc.onStop(stateStandby);
   wc.onBind(stateBind);
+  wc.onSSID(changeSSID);
   wc.onCalibirate(stateCalibration);
-  wc.onColor(color);
+  wc.onColor(changeColor);
   wc.onGetColor(sendColor);
   wc.onVibro(vibroResponse);
   wc.onAlarm(Alarm);
 
+#ifndef DEV_MODE
   mpu.mpu_setup();
   mpu.disable();
+#endif
 
-  wc.connect();
-  stateSearch();
+  if (wc.bind_connection())
+    stateBind();
+  else
+  {
+    stateSearch();
+    wc.connect();
+  }
 }
 
 String mac = String(WiFi.macAddress());
@@ -300,7 +336,9 @@ void state_loop()
   ///
   ///
 
+#ifndef DEV_MODE
   mpu.mpu_loop(quat);
+#endif
 
   switch (_state)
   {
@@ -319,7 +357,9 @@ void state_loop()
   case Active:
   {
     if (quat)
+#ifndef DEV_MODE
       wc.sendBin(quat, 4 * sizeof(float), MPU_DATA);
+#endif
     break;
   }
   case Search:

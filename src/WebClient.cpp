@@ -18,10 +18,14 @@
 
 WebClient::WebClient(String bridge_id)
 {
-    b_id = bridge_id.toInt();
     if (!bridge_id.length())
         bridge_id = "0";
+    b_id = bridge_id;
     strcpy(ssid, ("mcs_" + bridge_id).c_str());
+
+    WiFi.disconnect();
+    WiFi.mode(WIFI_STA);
+    WiFi.setAutoReconnect(true);
 }
 
 bool WebClient::isConnected()
@@ -40,13 +44,22 @@ void WebClient::webSocketEvent(WStype_t type, uint8_t *payload, size_t length)
     {
     case WStype_DISCONNECTED:
         USE_SERIAL.printf("[WSc] Disconnected!\n");
+        if (bind)
+        {
+            if (ws_c)
+                bind_next();
+        }
+        else
+            _disconnect();
         ws_c = false;
-        _disconnect();
         break;
     case WStype_CONNECTED:
         USE_SERIAL.printf("[WSc] Connected to url: %s\n", payload);
         ws_c = true;
-        _connect();
+        if (bind)
+            web_ticker.detach();
+        else
+            _connect();
         // //10 seconds whois timeout
         // web_ticker.once<WebClient *>(10, [](WebClient *wc) {
         //     wc->webSocket.disconnect();
@@ -91,9 +104,6 @@ void WebClient::webSocketEvent(WStype_t type, uint8_t *payload, size_t length)
             }
         }
 
-        // if (bind && strcmp("007", (char *)payload) == 0)
-        //     _bndevent();
-
         if (strcmp("101", (char *)payload) == 0)
             _startevent();
         if (strcmp("010", (char *)payload) == 0)
@@ -132,7 +142,12 @@ void WebClient::webSocketEvent(WStype_t type, uint8_t *payload, size_t length)
         //Vibration command
         case 0x5A:
             if (_vibroevent)
-                _vibroevent();
+            {
+                if (length > 1)
+                    _vibroevent(payload[1]);
+                else
+                    _vibroevent(0);
+            }
             break;
         //Start MoCap command
         case 0xB:
@@ -179,6 +194,26 @@ void WebClient::webSocketEvent(WStype_t type, uint8_t *payload, size_t length)
         case 0x15:
             sendMac();
             break;
+        //Bind accept command
+        case 0xC8:
+            if (bind && _changessid)
+            {
+                Serial.println("Accept bind command");
+                b_id = WiFi.SSID(i_ssid).substring(7);
+                strcpy(ssid, ("mcs_" + b_id).c_str());
+                _changessid(b_id);
+                bind = false;
+                _disconnect();
+                connect();
+            }
+        //Bind reject command
+        case 0xC9:
+            if (bind)
+            {
+                Serial.println("Reject bind command");
+                bind_next();
+                // _disconnect();
+            }
         }
     }
 }
@@ -208,12 +243,17 @@ void WebClient::onColor(ColorEvent event)
     _changecolor = event;
 }
 
+void WebClient::onSSID(StringEvent event)
+{
+    _changessid = event;
+}
+
 void WebClient::onGetColor(Event event)
 {
     _getcolor = event;
 }
 
-void WebClient::onVibro(Event event)
+void WebClient::onVibro(IntEvent event)
 {
     _vibroevent = event;
 }
@@ -266,31 +306,61 @@ void WebClient::sendMac()
 void WebClient::sendBridgeID()
 {
     uint8_t buf[4];
-    *(uint32_t *)buf = b_id;
+    *(uint32_t *)buf = b_id.toInt();
     sendBin(buf, 4);
 }
 
-void WebClient::connect()
+void WebClient::connect(bool bind_connection)
+{
+    connect(this->ssid, bind_connection);
+}
+
+void WebClient::connect(const char *ssid, bool bind_connection)
 {
     Serial.print("Connecting to ");
-    Serial.print(ssid);
+    Serial.println(ssid);
     //WiFi connection
-    bind = false;
-    WiFi.disconnect();
-    WiFi.mode(WIFI_STA);
-    WiFi.setAutoReconnect(true);
-    connectHandler = WiFi.onStationModeConnected([&](const WiFiEventStationModeConnected &e) {
-        wifi_c = true;
-        _wificonnect(e);
-    });
-    disconnectHandler = WiFi.onStationModeDisconnected([&](const WiFiEventStationModeDisconnected &e) {
-        if (wifi_c)
-        {
+    if (bind_connection)
+    {
+        Serial.println("Bind");
+
+        connectHandler = WiFi.onStationModeConnected([&](const WiFiEventStationModeConnected &e) {
+            Serial.println("WiFi connect");
+            wifi_c = true;
+        });
+
+        disconnectHandler = WiFi.onStationModeDisconnected([&](const WiFiEventStationModeDisconnected &e) {
+            Serial.println("WiFi disconnect");
             wifi_c = false;
-            ws_c = false;
-            _wifidisconnect(e);
-        }
-    });
+            bind_next();
+        });
+
+        web_ticker.once<WebClient *>(10, [](WebClient *wc) {
+            Serial.println("Time is out");
+            wc->bind_next();
+        },
+                                     this);
+    }
+    else
+    {
+        Serial.println("Normal");
+
+        WiFi.disconnect();
+        bind = false;
+        connectHandler = WiFi.onStationModeConnected([&](const WiFiEventStationModeConnected &e) {
+            wifi_c = true;
+            _wificonnect(e);
+        });
+        disconnectHandler = WiFi.onStationModeDisconnected([&](const WiFiEventStationModeDisconnected &e) {
+            Serial.println("WiFi disconnect 1");
+            if (wifi_c)
+            {
+                wifi_c = false;
+                ws_c = false;
+                _wifidisconnect(e);
+            }
+        });
+    }
     WiFi.begin(ssid);
 
     //WebSocet connection
@@ -305,21 +375,81 @@ void WebClient::connect()
 
 bool WebClient::bind_connection()
 {
-    WiFi.mode(WIFI_STA);
-    WiFi.disconnect();
-
-    int n = WiFi.scanNetworks(false, true);
+    Serial.println("bind_connection start");
+    int n = ssid_count = WiFi.scanNetworks(false, true);
     String ssid = "";
+    //bool my_bind = false;
+
+    Serial.print("ssid_count: ");
+    Serial.println(ssid_count);
+
     for (int i = 0; i < n; ++i)
     {
         ssid = WiFi.SSID(i);
-        if (ssid.startsWith("mcsbnd"))
+        if (strcmp(ssid.c_str(), this->ssid) == 0)
+        {
+            Serial.println("find my bridge");
+            Serial.println("bind_connection end");
+            return false;
+        }
+
+        //  if (ssid == "mcsbnd_" + b_id)
+        //    my_bind = true;
+    }
+
+    for (i_ssid = 0; i_ssid < n; ++i_ssid)
+    {
+        ssid = WiFi.SSID(i_ssid);
+
+        if (ssid.length() > 7 && ssid.startsWith("mcsbnd_"))
         {
             bind = true;
-            WiFi.begin(ssid.c_str());
+            i_ssid++;
+            _bndevent();
+            connect(ssid.c_str(), true);
+            Serial.println("bind_connection end");
             return true;
         }
     }
 
+    Serial.println("bind_connection end");
     return false;
+}
+
+void WebClient::bind_next()
+{
+    Serial.println("bind_next start");
+    Serial.print("i_ssid: ");
+    Serial.println(i_ssid);
+
+    if (!bind)
+        return;
+
+    String ssid;
+
+    for (; i_ssid < ssid_count; ++i_ssid)
+    {
+        ssid = WiFi.SSID(i_ssid);
+
+        if (ssid.length() > 7 && ssid.startsWith("mcsbnd_"))
+        {
+            Serial.print("ssid found: ");
+            Serial.println(ssid);
+            i_ssid++;
+            connect(ssid.c_str(), true);
+            Serial.println("bind_next end");
+            return;
+        }
+    }
+
+    if (i_ssid == ssid_count)
+    {
+        Serial.println("i_ssid == ssid_count");
+        bind = false;
+        wifi_c = ws_c = false;
+        WiFi.disconnect();
+        _disconnect();
+        connect();
+    }
+    Serial.println("bind_next end");
 }

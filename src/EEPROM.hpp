@@ -153,7 +153,7 @@ bool WriteRGB(uint8_t *buf, uint16_t address)
 
     for (int i = 0; i < color_size * 2; ++i)
     {
-        EEPROM.write(address++, buf[i]);
+        EEPROM.write(address++, buf[i] / 4);
     }
 
     EEPROM.write(address + color_size * 2, 'o');

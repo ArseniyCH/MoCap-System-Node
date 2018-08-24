@@ -10,18 +10,16 @@
 #include <Arduino.h>
 #include <Ticker.h>
 
-Vibro::Vibro(uint8_t pin, uint8_t gnd_pin)
+Vibro::Vibro(uint8_t pin)
 {
     _pin = pin;
     pinMode(pin, OUTPUT);
     digitalWrite(pin, LOW);
-        pinMode(gnd_pin, OUTPUT);
-    digitalWrite(gnd_pin, LOW);
 }
 
 void Vibro::AlarmVibration()
 {
-    vibro_ticker.attach_ms<Vibro *>(100, [](Vibro *v) {
+    vibro_ticker.attach_ms<Vibro *>(500, [](Vibro *v) {
         if (v->tumbler)
             v->on();
         else
@@ -49,7 +47,7 @@ void Vibro::DoneVibration()
     killAfter(1000);
 }
 
-void Vibro::SingleVibration(uint16_t power, uint16_t milliseconds)
+void Vibro::SingleVibration(uint16_t milliseconds, uint16_t power)
 {
     on(power);
     vibro_ticker.attach_ms<Vibro *>(milliseconds, [](Vibro *v) {

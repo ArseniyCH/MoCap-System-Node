@@ -27,6 +27,8 @@
 
 typedef std::function<void()> Event;
 typedef std::function<void(uint16_t (&f)[3], uint16_t (&s)[3])> ColorEvent;
+typedef std::function<void(uint16_t number)> IntEvent;
+typedef std::function<void(String str)> StringEvent;
 typedef std::function<void(const WiFiEventStationModeConnected &)> WiFiConnectedEvent;
 typedef std::function<void(const WiFiEventStationModeDisconnected &)> WiFiDisconnectedEvent;
 
@@ -130,18 +132,26 @@ public:
   void onColor(ColorEvent eventFunc);
 
   /**
+   * @brief Set handler for onSSID event
+   * 
+   * @param eventFunc 
+   */
+  void onSSID(StringEvent eventFunc);
+
+  /**
    * @brief Set handler for onGetColor event 
    * 
    * @param eventFunc 
    */
-  void onGetColor(Event eventFunc);
+  void
+  onGetColor(Event eventFunc);
 
   /**
    * @brief Set handler for onVibro event 
    * 
    * @param eventFunc 
    */
-  void onVibro(Event eventFunc);
+  void onVibro(IntEvent eventFunc);
 
   /**
    * @brief Set handler for onAlarm event  
@@ -182,7 +192,9 @@ public:
    * @brief Trying connect to Bridge AP (access point) and wc connection
    * 
    */
-  void connect();
+  void connect(bool bind_connection = false);
+  void connect(const char *ssid, bool bind_connection = false);
+
   /**
    * @brief Trying connect to Bridge AP (access point) in binding mode
    * 
@@ -190,6 +202,12 @@ public:
    * @return false 
    */
   bool bind_connection();
+
+  /**
+   * @brief Connect to next Bridge AP in binding mode
+   * 
+   */
+  void bind_next();
 
   bool bind = false;
   int32_t bindStartTime;
@@ -216,9 +234,10 @@ private:
   Event _stopevent;
   Event _calibevent;
   Event _alarmevent;
-  Event _vibroevent; //TODO: power and duration from bridge!
+  IntEvent _vibroevent;
   Event _getcolor;
   ColorEvent _changecolor;
+  StringEvent _changessid;
   Event _connect;
   WiFiConnectedEvent _wificonnect = [](const WiFiEventStationModeConnected &) {};
   Event _disconnect;
@@ -231,11 +250,12 @@ private:
   bool wifi_c = false;
   bool ws_c = false;
 
-  int ssid_count;
+  int ssid_count = 0;
+  int i_ssid = 0;
 
   char ssid[25];
 
-  uint32_t b_id = 0;
+  String b_id = "";
   char *ip = (char *)"192.168.4.1";
   uint16_t port = 80;
   char *url = (char *)"\\ws";

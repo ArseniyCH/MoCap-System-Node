@@ -26,8 +26,9 @@
 #define CALIBRATION_OFFSET 0x64
 
 typedef std::function<void()> Event;
-typedef std::function<void(uint16_t (&f)[3], uint16_t (&s)[3])> ColorEvent;
+typedef std::function<void(uint16_t (&f)[6])> ColorEvent;
 typedef std::function<void(uint16_t number)> IntEvent;
+typedef std::function<void(bool flag)> BoolEvent;
 typedef std::function<void(String str)> StringEvent;
 typedef std::function<void(const WiFiEventStationModeConnected &)> WiFiConnectedEvent;
 typedef std::function<void(const WiFiEventStationModeDisconnected &)> WiFiDisconnectedEvent;
@@ -43,22 +44,9 @@ public:
 
   ~WebClient(){};
 
-  /**
-   * @brief WebClient setup method
-   * 
-   */
-  void setup();
-
   void loop()
   {
-    if (WiFi.status() == WL_CONNECTED)
-    {
-      webSocket.loop();
-    }
-    else
-    {
-      webSocket.disconnect();
-    }
+    webSocket.loop();
   }
 
   /**
@@ -154,6 +142,13 @@ public:
   void onVibro(IntEvent eventFunc);
 
   /**
+   * @brief Set handler for onLedIO event
+   * 
+   * @param eventFunc 
+   */
+  void onLedIO(BoolEvent eventFunc);
+
+  /**
    * @brief Set handler for onAlarm event  
    * 
    * @param eventFunc 
@@ -189,11 +184,20 @@ public:
   void sendTXT(String str);
 
   /**
-   * @brief Trying connect to Bridge AP (access point) and wc connection
+   * @brief Trying connect to Bridge AP (access point)
    * 
    */
   void connect(bool bind_connection = false);
   void connect(const char *ssid, bool bind_connection = false);
+
+  /**
+   * @brief Begin websocket connection
+   * 
+   * @param host 
+   * @param port 
+   * @param url 
+   */
+  void ws_connect(IPAddress host, uint16_t port, const char *url = "/");
 
   /**
    * @brief Trying connect to Bridge AP (access point) in binding mode
@@ -213,7 +217,7 @@ public:
   int32_t bindStartTime;
 
 private:
-  Ticker web_ticker;
+  Ticker web_ticker, ws_ticker;
 
   WebSocketsClient webSocket;
 
@@ -235,6 +239,7 @@ private:
   Event _calibevent;
   Event _alarmevent;
   IntEvent _vibroevent;
+  BoolEvent _ledioevent;
   Event _getcolor;
   ColorEvent _changecolor;
   StringEvent _changessid;

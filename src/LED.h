@@ -73,10 +73,18 @@ public:
   ~LED();
 
   /**
+   * @brief Method for enable/disable led indicator
+   * 
+   * @param enable 
+   */
+  void set_availability(bool enable);
+
+  /**
    * @brief Main loop of led
    * 
    */
-  void smooth_blink(uint16_t frequency);
+  void
+  smooth_blink(uint16_t frequency);
 
   /**
    * @brief Setup color of lighting 
@@ -87,6 +95,15 @@ public:
    * @param second Optional color
    */
   void setup_color(RGB first, RGB second = NONE);
+
+  /**
+   * @brief Setup color of lighting 
+   * 
+   * Other method to setup colors
+   * 
+   * @param c array of colors
+   */
+  void setup_color(uint16_t (&c)[6]);
 
   /**
    * @brief Turns on constant indication
@@ -200,6 +217,8 @@ private:
   RGB steps = NONE;
   bool rise = true;
 
+  bool enabled = true;
+
   /**
    * @brief Calculate steps to all of colors
    * 
@@ -255,7 +274,7 @@ private:
    * 
    * @param col 
    */
-  void set_color(RGB col);
+  void set_color(RGB col, bool alarm = false);
   void update_color(int16_t current);
   /**
    * @brief Switch mode of led state machine

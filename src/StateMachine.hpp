@@ -34,6 +34,8 @@ typedef enum
 } State;
 
 LED led = LED(13, 12, 14);
+uint16_t mem_colors[6];
+
 WebClient wc = WebClient(ReadString(10));
 
 MPU &mpu = MPU::Instance();
@@ -41,6 +43,8 @@ Vibro vibr = Vibro(4);
 State _state = Undef;
 
 Ticker MPU_ticker;
+
+uint8_t *quat = new uint8_t[4 * sizeof(float)];
 
 /**
  * @brief Set the State of StateMachine
@@ -72,9 +76,7 @@ void setState(State state)
     break;
   case Active:
     Serial.println("Exit from Active state");
-#ifdef DEV_MODE
     MPU_ticker.detach();
-#endif
     mpu.disable();
     break;
   case Search:
@@ -102,6 +104,8 @@ void stateUndef()
  */
 void stateSearch()
 {
+  if (_state != Undef)
+    led.BlueBlink();
   setState(Search);
   Serial.println("Switch to Search state");
 }
@@ -114,6 +118,8 @@ void stateBind()
 {
   if (_state != Undef && _state != Search)
     return;
+
+  led.CrossFade(mem_colors);
 
   setState(Bind);
   Serial.println("Switch to Bind state");
@@ -131,6 +137,9 @@ void stateCalibration()
 {
   if (_state != Standby)
     return;
+
+  led.Calibration();
+
   setState(Calibration);
   Serial.println("Switch to Search state");
   // State Calibration enter logic
@@ -159,11 +168,16 @@ void stateActive()
   Serial.println("Switch to Active state");
   mpu.enable();
 #ifdef DEV_MODE
-  MPU_ticker.attach_ms<WebClient *>(50, [](WebClient *wc) {
+  MPU_ticker.attach_ms(50, []() {
     uint8_t *quat = (uint8_t *)"0000000000000000";
-    wc->sendBin(quat, 4 * sizeof(float), MPU_DATA);
-  },
-                                    &wc);
+    wc.sendBin(quat, 4 * sizeof(float), MPU_DATA);
+  });
+#else
+  MPU_ticker.attach_ms(50, []() {
+    mpu.mpu_loop(quat);
+    if (quat)
+      wc.sendBin(quat, 4 * sizeof(float), MPU_DATA);
+  });
 #endif
   // State Active enter logic
 }
@@ -175,9 +189,7 @@ void stateActive()
 void connect()
 {
   Serial.println("Connected!");
-  uint16_t col[6];
-  ReadMappedRGB(col, COLOR_ADDRESS);
-  led.CrossFade(col);
+  led.CrossFade(mem_colors);
   stateStandby();
 }
 
@@ -201,18 +213,47 @@ void disconnect()
  * @param f First color
  * @param s Second color 
  */
-void changeColor(uint16_t (&f)[3], uint16_t (&s)[3])
+void changeColor(uint16_t (&c)[6])
 {
-  WriteRGB({}, 100);
-  led.setup_color({f[0], f[1], f[2]}, {s[0], s[1], s[2]});
+  if (_state != Standby && _state != Bind)
+    return;
+
+  Serial.println("Changing color");
+  Serial.print("first: {");
+  for (int i = 0; i < 3; ++i)
+  {
+    Serial.print(c[i]);
+    Serial.print(" ");
+  }
+  Serial.println("}");
+  Serial.print("second: {");
+  for (int i = 3; i < 6; ++i)
+  {
+    Serial.print(c[i]);
+    Serial.print(" ");
+  }
+  Serial.println("}");
+
+  WriteRGB(c, COLOR_ADDRESS);
+  for (int i = 0; i < color_size; ++i)
+    mem_colors[i] = c[i];
+  led.CrossFade(c);
 }
 
 void sendColor()
 {
+  if (_state != Standby && _state != Bind)
+    return;
+
   uint8_t colors[6];
-  ReadRGB(colors, 100);
+  ReadMappedRGB(colors, COLOR_ADDRESS);
 
   wc.sendBin(colors, 6, COLORS);
+}
+
+void setLedIO(bool enable)
+{
+  led.set_availability(enable);
 }
 
 void vibroResponse(uint16_t seconds)
@@ -232,7 +273,9 @@ void Alarm()
 
 void changeSSID(String ssid)
 {
-  //TODO: write function body!
+  if (_state != Bind)
+    return;
+  SaveString(10, (uint8_t *)ssid.c_str(), ssid.length());
 }
 
 /**
@@ -251,8 +294,11 @@ void state_setup()
   wc.onCalibirate(stateCalibration);
   wc.onColor(changeColor);
   wc.onGetColor(sendColor);
+  wc.onLedIO(setLedIO);
   wc.onVibro(vibroResponse);
   wc.onAlarm(Alarm);
+
+  ReadRGB(mem_colors, COLOR_ADDRESS);
 
 #ifndef DEV_MODE
   mpu.mpu_setup();
@@ -267,10 +313,6 @@ void state_setup()
     wc.connect();
   }
 }
-
-String mac = String(WiFi.macAddress());
-
-uint8_t *quat = new uint8_t[4 * sizeof(float)];
 
 /**
  * @brief State machine loop method
@@ -336,10 +378,6 @@ void state_loop()
   ///
   ///
 
-#ifndef DEV_MODE
-  mpu.mpu_loop(quat);
-#endif
-
   switch (_state)
   {
   case Undef:
@@ -356,10 +394,7 @@ void state_loop()
     break;
   case Active:
   {
-    if (quat)
-#ifndef DEV_MODE
-      wc.sendBin(quat, 4 * sizeof(float), MPU_DATA);
-#endif
+    // state Active loop logic
     break;
   }
   case Search:

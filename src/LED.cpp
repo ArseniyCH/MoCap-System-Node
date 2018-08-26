@@ -39,10 +39,29 @@ LED::LED(uint8_t Rpin, uint8_t Gpin, uint8_t Bpin)
     Off();
 }
 
+void LED::set_availability(bool enable)
+{
+    if (enable != enabled)
+    {
+        enabled = enable;
+        if (!enable)
+        {
+            digitalWrite(r, HIGH);
+            digitalWrite(g, HIGH);
+            digitalWrite(b, HIGH);
+        }
+    }
+}
+
 void LED::setup_color(RGB first, RGB second)
 {
     color = first;
     sec_color = second;
+}
+
+void LED::setup_color(uint16_t (&c)[6])
+{
+    setup_color({c[0], c[1], c[2]}, {c[3], c[4], c[5]});
 }
 
 void LED::smooth_blink(uint16_t frequency)
@@ -117,9 +136,12 @@ bool LED::owerflow_check(RGB val, RGB steps, RGB color, RGB sec_color)
     return false;
 }
 
-void LED::set_color(RGB col)
+void LED::set_color(RGB col, bool alarm)
 {
     current = col;
+    if (!enabled && !alarm)
+        return;
+
     if (col.R >= 0)
         analogWrite(r, 1023 - col.R);
     if (col.G >= 0)
@@ -186,7 +208,7 @@ void LED::CrossFade(RGB first, RGB second)
     smooth_blink(25);
 }
 
-void LED::CrossFade(uint16_t colors[16])
+void LED::CrossFade(uint16_t colors[6])
 {
     CrossFade({colors[0], colors[1], colors[2]}, {colors[3], colors[4], colors[5]});
 }
@@ -197,9 +219,9 @@ void LED::Alarm()
 
     led_ticker.attach_ms<LED *>(100, [](LED *led) {
         if (led->rise)
-            led->set_color(led->color);
+            led->set_color(led->color, true);
         else
-            led->set_color(led->sec_color);
+            led->set_color(led->sec_color, true);
 
         led->rise = !led->rise;
     },

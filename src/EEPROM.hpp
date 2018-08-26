@@ -137,23 +137,35 @@ void SaveInt(int addr, int num)
  * @param addr Start address
  * @return int 
  */
-int ReadInt(int addr)
+uint16_t ReadInt(uint16_t addr)
 {
     EEPROM.begin(512);
-    byte raw[2];
-    for (byte i = 0; i < 2; i++)
-        raw[i] = EEPROM.read(addr + i);
-    int &num = (int &)raw;
-    return num;
+    uint16_t number;
+
+    number = EEPROM.read(addr++);
+    number = number << 8;
+    number |= EEPROM.read(addr);
+
+    Serial.print("OK: ");
+    Serial.print(EEPROM.read(addr - 1));
+    Serial.println(EEPROM.read(addr));
+
+    Serial.print("Number: ");
+    Serial.println(number);
+
+    return number;
 }
 
-bool WriteRGB(uint8_t *buf, uint16_t address)
+void WriteRGB(uint16_t *buf, uint16_t address, bool is8bit = false)
 {
     EEPROM.begin(512);
 
     for (int i = 0; i < color_size * 2; ++i)
     {
-        EEPROM.write(address++, buf[i] / 4);
+        if (!is8bit)
+            EEPROM.write(address++, buf[i] / 4);
+        else
+            EEPROM.write(address++, buf[i]);
     }
 
     EEPROM.write(address + color_size * 2, 'o');
@@ -162,16 +174,18 @@ bool WriteRGB(uint8_t *buf, uint16_t address)
     EEPROM.commit();
 }
 
-void ReadRGB(uint8_t *buf, uint16_t address)
+void ReadMappedRGB(uint8_t *buf, uint16_t address)
 {
     EEPROM.begin(512);
 
     int16_t check = ReadInt(address + color_size * 2);
-    if (check != 2300)
+    Serial.print("check: ");
+    Serial.println(check);
+    if (check != 28523)
     {
         memset(buf, 0, color_size * 2);
         buf[2] = 0xFF;
-        WriteRGB(buf, address);
+        WriteRGB((uint16_t *)buf, address, true);
         EEPROM.end();
         return;
     }
@@ -186,10 +200,10 @@ void ReadRGB(uint8_t *buf, uint16_t address)
     return;
 }
 
-void ReadMappedRGB(uint16_t *buf, uint16_t address)
+void ReadRGB(uint16_t *buf, uint16_t address)
 {
     uint8_t *pre = new uint8_t[color_size * 2];
-    ReadRGB(pre, address);
+    ReadMappedRGB(pre, address);
     for (int i = 0; i < color_size * 2; ++i)
     {
         buf[i] = pre[i] * 4;

@@ -34,7 +34,7 @@ void Vibro::AlarmVibration()
 
 void Vibro::DoneVibration()
 {
-    vibro_ticker.attach_ms<Vibro *>(20, [](Vibro *v) {
+    vibro_ticker.attach_ms<Vibro *>(150, [](Vibro *v) {
         if (v->tumbler)
             v->on();
         else
@@ -44,7 +44,7 @@ void Vibro::DoneVibration()
     },
                                     this);
 
-    killAfter(1000);
+    killAfter(600);
 }
 
 void Vibro::SingleVibration(uint16_t milliseconds, uint16_t power)

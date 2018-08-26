@@ -26,6 +26,12 @@ WebClient::WebClient(String bridge_id)
     WiFi.disconnect();
     WiFi.mode(WIFI_STA);
     WiFi.setAutoReconnect(true);
+
+    webSocket.onEvent(std::bind(&WebClient::webSocketEvent, this,
+                                std::placeholders::_1,
+                                std::placeholders::_2,
+                                std::placeholders::_3));
+    webSocket.setReconnectInterval(5000);
 }
 
 bool WebClient::isConnected()
@@ -56,6 +62,7 @@ void WebClient::webSocketEvent(WStype_t type, uint8_t *payload, size_t length)
     case WStype_CONNECTED:
         USE_SERIAL.printf("[WSc] Connected to url: %s\n", payload);
         ws_c = true;
+        ws_ticker.detach();
         if (bind)
             web_ticker.detach();
         else
@@ -168,18 +175,29 @@ void WebClient::webSocketEvent(WStype_t type, uint8_t *payload, size_t length)
         case 0x51:
             if (_changecolor)
             {
-                uint16_t f[3] = {0, 0, 0};
-                uint16_t s[3] = {0, 0, 0};
+                uint16_t c[6] = {0};
 
                 if (length > 3)
-                    uint16_t f[3] = {payload[1], payload[2], payload[3]};
+                    for (int i = 0; i < 3; ++i)
+                        c[i] = payload[i + 1] * 4;
                 else
                     break;
 
-                if (length > 5)
-                    uint16_t s[3] = {payload[4], payload[5], payload[6]};
-                _changecolor(f, s);
+                if (length > 6)
+                    for (int i = 3; i < 6; ++i)
+                        c[i] = payload[i + 1] * 4;
+                _changecolor(c);
             }
+            break;
+        //Led enable command
+        case 0x55:
+            if (_ledioevent)
+                _ledioevent(true);
+            break;
+        //Led disable command
+        case 0x56:
+            if (_ledioevent)
+                _ledioevent(false);
             break;
         //Alarm command
         case 0x59:
@@ -199,13 +217,17 @@ void WebClient::webSocketEvent(WStype_t type, uint8_t *payload, size_t length)
             if (bind && _changessid)
             {
                 Serial.println("Accept bind command");
+                String ssid = WiFi.SSID(i_ssid);
+                if (!ssid.startsWith("mcsbnd_") || !ssid.length() > 7)
+                    break;
                 b_id = WiFi.SSID(i_ssid).substring(7);
-                strcpy(ssid, ("mcs_" + b_id).c_str());
+                strcpy(this->ssid, ("mcs_" + b_id).c_str());
                 _changessid(b_id);
                 bind = false;
                 _disconnect();
                 connect();
             }
+            break;
         //Bind reject command
         case 0xC9:
             if (bind)
@@ -256,6 +278,11 @@ void WebClient::onGetColor(Event event)
 void WebClient::onVibro(IntEvent event)
 {
     _vibroevent = event;
+}
+
+void WebClient::onLedIO(BoolEvent event)
+{
+    _ledioevent = event;
 }
 
 void WebClient::onAlarm(Event event)
@@ -327,12 +354,25 @@ void WebClient::connect(const char *ssid, bool bind_connection)
         connectHandler = WiFi.onStationModeConnected([&](const WiFiEventStationModeConnected &e) {
             Serial.println("WiFi connect");
             wifi_c = true;
+
+            ws_ticker.attach_ms<WebClient *>(500, [](WebClient *wc) {
+                if (WiFi.gatewayIP() != INADDR_NONE)
+                {
+                    Serial.println("Hi!");
+                    wc->ws_connect(WiFi.gatewayIP(), 80, "/ws");
+                }
+            },
+                                             this);
         });
 
         disconnectHandler = WiFi.onStationModeDisconnected([&](const WiFiEventStationModeDisconnected &e) {
             Serial.println("WiFi disconnect");
-            wifi_c = false;
-            bind_next();
+            if (wifi_c)
+            {
+                ws_ticker.detach();
+                wifi_c = false;
+                bind_next();
+            }
         });
 
         web_ticker.once<WebClient *>(10, [](WebClient *wc) {
@@ -350,11 +390,19 @@ void WebClient::connect(const char *ssid, bool bind_connection)
         connectHandler = WiFi.onStationModeConnected([&](const WiFiEventStationModeConnected &e) {
             wifi_c = true;
             _wificonnect(e);
+
+            ws_ticker.attach_ms<WebClient *>(500, [](WebClient *wc) {
+                if (WiFi.gatewayIP() != INADDR_NONE)
+                    wc->ws_connect(WiFi.gatewayIP(), 80, "/ws");
+            },
+                                             this);
         });
         disconnectHandler = WiFi.onStationModeDisconnected([&](const WiFiEventStationModeDisconnected &e) {
             Serial.println("WiFi disconnect 1");
             if (wifi_c)
             {
+                ws_ticker.detach();
+                webSocket.disconnect();
                 wifi_c = false;
                 ws_c = false;
                 _wifidisconnect(e);
@@ -365,12 +413,13 @@ void WebClient::connect(const char *ssid, bool bind_connection)
 
     //WebSocet connection
     //webSocket.begin(ip, port, url);
-    webSocket.begin("192.168.4.1", 80, "/ws");
-    webSocket.onEvent(std::bind(&WebClient::webSocketEvent, this,
-                                std::placeholders::_1,
-                                std::placeholders::_2,
-                                std::placeholders::_3));
-    webSocket.setReconnectInterval(5000);
+}
+
+void WebClient::ws_connect(IPAddress host, uint16_t port, const char *url)
+{
+    Serial.print("ws_connect; host: ");
+    Serial.println(host);
+    webSocket.begin(host, port, url);
 }
 
 bool WebClient::bind_connection()

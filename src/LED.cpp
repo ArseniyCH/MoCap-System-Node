@@ -64,11 +64,28 @@ void LED::setup_color(uint16_t (&c)[6])
     setup_color({c[0], c[1], c[2]}, {c[3], c[4], c[5]});
 }
 
-void LED::smooth_blink(uint16_t frequency)
+void LED::smooth_blink(uint16_t frequency, bool delay)
 {
+    delay_active = delay;
+    current_step = 0;
     led_ticker.attach_ms<LED *>(frequency, [](LED *led) {
-        led->current = calculate_values(led->current, led->steps, led->color, led->sec_color, led->rise);
-        led->set_color(led->current);
+        led->PrintCurrent();
+        if (led->delay_cycles > 0)
+            led->delay_cycles--;
+        else
+        {
+            led->current = calculate_values(led->current, led->steps, led->color, led->sec_color, led->rise);
+
+            if (++led->current_step == STEPS)
+            {
+                led->rise = !led->rise;
+                led->current_step = 0;
+                if (led->delay_active)
+                    led->delay_cycles = 20;
+            }
+
+            led->set_color(led->current);
+        }
     },
                                 this);
 }
@@ -95,10 +112,10 @@ RGB LED::calculate_values(RGB current, RGB steps, RGB color, RGB sec_color, bool
     updV.G = calc_value(current.G, steps.G, color.G, sec_color.G, rise);
     updV.B = calc_value(current.B, steps.B, color.B, sec_color.B, rise);
 
-    if (owerflow_check(updV, steps, color, sec_color))
-    {
-        rise = !rise;
-    }
+    // if (owerflow_check(updV, steps, color, sec_color))
+    // {
+    //     rise = !rise;
+    // }
 
     return updV;
 }
@@ -111,29 +128,6 @@ int16_t LED::calc_value(int16_t val, int16_t step, int16_t min, int16_t max, boo
         val -= step;
 
     return val;
-}
-
-bool LED::owerflow_check(RGB val, RGB steps, RGB color, RGB sec_color)
-{
-    if (steps.R)
-        if (val.R - steps.R < min(color.R, sec_color.R) || val.R + steps.R > max(color.R, sec_color.R))
-        {
-            return true;
-        }
-
-    if (steps.G)
-        if (val.G - steps.G < min(color.G, sec_color.G) || val.G + steps.G > max(color.G, sec_color.G))
-        {
-            return true;
-        }
-
-    if (steps.B)
-        if (val.B - steps.B < min(color.B, sec_color.B) || val.B + steps.B > max(color.B, sec_color.B))
-        {
-            return true;
-        }
-
-    return false;
 }
 
 void LED::set_color(RGB col, bool alarm)
@@ -183,7 +177,6 @@ void LED::stateBlink()
 {
     switch_mode(BLINK);
     steps = calculate_step(color, sec_color);
-    set_color(sec_color);
 }
 
 void LED::stateSBlink(RGB col, RGB s_col)
@@ -200,17 +193,35 @@ void LED::ConstantLighting(RGB color)
     stateOn(color);
 }
 
-void LED::CrossFade(RGB first, RGB second)
+void LED::CrossFade(RGB first, RGB second, bool withTransition, bool delay)
 {
+    Serial.println("CrossFade");
     _prevmode = CROSSFADE;
     setup_color(first, second);
     stateBlink();
-    smooth_blink(25);
+    if (withTransition)
+    {
+        Serial.println("with transition");
+        transition_blink(30);
+        return;
+    }
+    set_color(sec_color);
+    smooth_blink(30, delay);
 }
 
-void LED::CrossFade(uint16_t colors[6])
+void LED::CrossFade(uint16_t colors[6], bool withTransition, bool delay)
 {
-    CrossFade({colors[0], colors[1], colors[2]}, {colors[3], colors[4], colors[5]});
+    CrossFade({colors[0], colors[1], colors[2]}, {colors[3], colors[4], colors[5]}, withTransition, delay);
+}
+
+void LED::transition_blink(uint16_t freaquency)
+{
+    setup_color(current, sec_color);
+    steps = calculate_step(sec_color, current);
+
+    smooth_blink(freaquency, false);
+
+    blinkAfter(freaquency * STEPS);
 }
 
 void LED::Alarm()
@@ -235,15 +246,18 @@ void LED::Calibration()
     _prevmode = CALIBRATION;
     setup_color({1000, 500, 1000}, {0, 1000, 500}); //as variant for calibration
     stateBlink();
+    set_color(sec_color);
     smooth_blink(23);
 }
 
 void LED::BlueBlink()
 {
+    Serial.println("BlueBlink");
     _prevmode = BLUEBLINK;
     setup_color({0, 0, 1024});
     stateBlink();
-    smooth_blink(20);
+    set_color(sec_color);
+    smooth_blink(30);
 }
 
 void LED::SingleBlink(RGB col)
@@ -251,7 +265,6 @@ void LED::SingleBlink(RGB col)
     uint16_t fr = 30;
     stateSBlink(col);
     smooth_blink(fr);
-
     killAfter(2 * fr * STEPS);
 }
 
@@ -278,6 +291,15 @@ void LED::killAfter(uint32_t milliseconds)
             led->Calibration();
             break;
         }
+    },
+                                 this);
+}
+
+void LED::blinkAfter(uint32_t milliseconds)
+{
+    ticker_killer.once_ms<LED *>(milliseconds, [](LED *led) {
+        led->led_ticker.detach();
+        led->CrossFade(led->_prev_f, led->_prev_s, false);
     },
                                  this);
 }

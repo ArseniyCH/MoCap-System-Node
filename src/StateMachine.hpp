@@ -123,10 +123,6 @@ void stateBind()
 
   setState(Bind);
   Serial.println("Switch to Bind state");
-  // if (wc.bind_connection())
-  //   wc.websockets_connection();
-  // else
-  //   stateSearch();
 }
 
 /**
@@ -142,7 +138,6 @@ void stateCalibration()
 
   setState(Calibration);
   Serial.println("Switch to Search state");
-  // State Calibration enter logic
 }
 
 /**
@@ -153,7 +148,6 @@ void stateStandby()
 {
   setState(Standby);
   Serial.println("Switch to Standby state");
-  // State Standby enter logic
 }
 
 /**
@@ -179,7 +173,6 @@ void stateActive()
       wc.sendBin(quat, 4 * sizeof(float), MPU_DATA);
   });
 #endif
-  // State Active enter logic
 }
 
 /**
@@ -218,24 +211,11 @@ void changeColor(uint16_t (&c)[6])
   if (_state != Standby && _state != Bind)
     return;
 
-  Serial.println("Changing color");
-  Serial.print("first: {");
-  for (int i = 0; i < 3; ++i)
-  {
-    Serial.print(c[i]);
-    Serial.print(" ");
-  }
-  Serial.println("}");
-  Serial.print("second: {");
-  for (int i = 3; i < 6; ++i)
-  {
-    Serial.print(c[i]);
-    Serial.print(" ");
-  }
-  Serial.println("}");
+  if (CompareArrays(c, mem_colors, color_size * 2))
+    return;
 
   WriteRGB(c, COLOR_ADDRESS);
-  for (int i = 0; i < color_size; ++i)
+  for (int i = 0; i < color_size * 2; ++i)
     mem_colors[i] = c[i];
   led.CrossFade(c);
 }
@@ -278,6 +258,14 @@ void changeSSID(String ssid)
   SaveString(10, (uint8_t *)ssid.c_str(), ssid.length());
 }
 
+void Restart()
+{
+  if (_state != Standby)
+    return;
+
+  ESP.restart();
+}
+
 /**
  * @brief State machine setup method
  * 
@@ -295,8 +283,11 @@ void state_setup()
   wc.onColor(changeColor);
   wc.onGetColor(sendColor);
   wc.onLedIO(setLedIO);
+  // wc.onLedIO(std::bind(&LED::set_availability, led,
+  //                      std::placeholders::_1));
   wc.onVibro(vibroResponse);
   wc.onAlarm(Alarm);
+  wc.onRestart(Restart);
 
   ReadRGB(mem_colors, COLOR_ADDRESS);
 
@@ -321,86 +312,6 @@ void state_setup()
 void state_loop()
 {
   wc.loop();
-  ///
-  ///
-  ///
-  String inString = "";
-  while (Serial.available() > 0)
-  {
-    int inChar = Serial.read();
-    if (inChar != '\n')
-      inString += (char)inChar;
-  }
-
-  if (!inString.equals(""))
-  {
-    if (inString.equals("0"))
-    {
-      led.Alarm();
-    }
-    if (inString.equals("1"))
-    {
-      Serial.println(inString);
-      led.ConstantLighting({0, 1000, 0});
-    }
-    if (inString.equals("2"))
-    {
-      Serial.println(inString);
-      led.CrossFade({1000, 0, 0}, {0, 0, 1000});
-    }
-    if (inString.equals("3"))
-    {
-      Serial.println(inString);
-      led.Off();
-    }
-    if (inString.equals("4"))
-    {
-      Serial.println(inString);
-      led.Calibration();
-    }
-    if (inString.equals("5"))
-    {
-      Serial.println(inString);
-      led.BlueBlink();
-    }
-    if (inString.equals("6"))
-    {
-      Serial.println(inString);
-      led.SingleBlink({55, 100, 400});
-    }
-    if (inString.equals("7"))
-    {
-      Serial.println(inString);
-      vibr.AlarmVibration();
-    }
-  }
-  ///
-  ///
-  ///
-
-  switch (_state)
-  {
-  case Undef:
-    // state Undef loop logic
-  case Bind:
-    // if (millis() - wc.bindStartTime > 30000)
-    //   stateSearch();
-    break;
-  case Calibration:
-    // state Calibration loop logic
-    break;
-  case Standby:
-    // state Standby loop logic
-    break;
-  case Active:
-  {
-    // state Active loop logic
-    break;
-  }
-  case Search:
-
-    break;
-  }
 };
 
 #endif

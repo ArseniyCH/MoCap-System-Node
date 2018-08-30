@@ -26,12 +26,6 @@ WebClient::WebClient(String bridge_id)
     WiFi.disconnect();
     WiFi.mode(WIFI_STA);
     WiFi.setAutoReconnect(true);
-
-    webSocket.onEvent(std::bind(&WebClient::webSocketEvent, this,
-                                std::placeholders::_1,
-                                std::placeholders::_2,
-                                std::placeholders::_3));
-    webSocket.setReconnectInterval(5000);
 }
 
 bool WebClient::isConnected()
@@ -50,13 +44,17 @@ void WebClient::webSocketEvent(WStype_t type, uint8_t *payload, size_t length)
     {
     case WStype_DISCONNECTED:
         USE_SERIAL.printf("[WSc] Disconnected!\n");
+        if (!ws_c)
+            break;
         if (bind)
         {
-            if (ws_c)
-                bind_next();
+            bind_next();
         }
         else
-            _disconnect();
+        {
+            WiFi.disconnect();
+            //  _disconnect();
+        }
         ws_c = false;
         break;
     case WStype_CONNECTED:
@@ -67,62 +65,10 @@ void WebClient::webSocketEvent(WStype_t type, uint8_t *payload, size_t length)
             web_ticker.detach();
         else
             _connect();
-        // //10 seconds whois timeout
-        // web_ticker.once<WebClient *>(10, [](WebClient *wc) {
-        //     wc->webSocket.disconnect();
-        // },
-        //                             this);
         break;
     case WStype_TEXT:
     {
         USE_SERIAL.printf("[WSc] get text: %s\n", payload);
-
-        /*
-        *007 - bind_accept
-        *101 - start command
-        *010 - stop command
-        *777 - calibiration command
-        */
-        if (strchr((char *)payload, ',') != NULL)
-        {
-            char buf[strlen((char *)payload)];
-            char *p = buf;
-            char *str;
-            int16_t rgb[3];
-            uint8_t i = 0;
-            str = strtok_r((char *)payload, ",", &p);
-            while (str != NULL && i < 3)
-            {
-                rgb[i++] = atoi(str);
-                str = strtok_r(NULL, ",", &p);
-            }
-
-            if (i = 3)
-            {
-                // Serial.print("Parse RGB: { ");
-                // Serial.print(rgb[0]);
-                // Serial.print(", ");
-                // Serial.print(rgb[1]);
-                // Serial.print(", ");
-                // Serial.print(rgb[2]);
-                // Serial.println("};");
-                // uint16_t s[3]{0, 0, 0};
-                // _changecolor(rgb, s);
-            }
-        }
-
-        if (strcmp("101", (char *)payload) == 0)
-            _startevent();
-        if (strcmp("010", (char *)payload) == 0)
-            _stopevent();
-        if (strcmp("777", (char *)payload) == 0)
-            _calibevent();
-        if (strcmp("whois", (char *)payload) == 0)
-        {
-            // web_ticker.detach();
-            sendMac();
-        }
-
         break;
     }
     case WStype_BIN:
@@ -236,7 +182,12 @@ void WebClient::webSocketEvent(WStype_t type, uint8_t *payload, size_t length)
                 bind_next();
                 // _disconnect();
             }
+            break;
         }
+    case 0x96:
+        if (_restartevent)
+            _restartevent();
+        break;
     }
 }
 
@@ -288,6 +239,11 @@ void WebClient::onLedIO(BoolEvent event)
 void WebClient::onAlarm(Event event)
 {
     _alarmevent = event;
+}
+
+void WebClient::onRestart(Event event)
+{
+    _restartevent = event;
 }
 
 void WebClient::onConnect(Event event)
@@ -347,29 +303,37 @@ void WebClient::connect(const char *ssid, bool bind_connection)
     Serial.print("Connecting to ");
     Serial.println(ssid);
     //WiFi connection
-    if (bind_connection)
-    {
-        Serial.println("Bind");
 
-        connectHandler = WiFi.onStationModeConnected([&](const WiFiEventStationModeConnected &e) {
-            Serial.println("WiFi connect");
-            wifi_c = true;
+    connectHandler = WiFi.onStationModeConnected([&](const WiFiEventStationModeConnected &e) {
+        Serial.println("WiFi connect");
+        wifi_c = true;
+        _wificonnect(e);
 
+        if (WiFi.gatewayIP() != INADDR_NONE)
+            ws_connect(WiFi.gatewayIP(), 80, "/ws");
+        else
             ws_ticker.attach_ms<WebClient *>(500, [](WebClient *wc) {
                 if (WiFi.gatewayIP() != INADDR_NONE)
                 {
                     Serial.println("Hi!");
                     wc->ws_connect(WiFi.gatewayIP(), 80, "/ws");
+                    wc->ws_ticker.detach();
                 }
             },
                                              this);
-        });
+    });
+
+    if (bind_connection)
+    {
+        Serial.println("Bind");
 
         disconnectHandler = WiFi.onStationModeDisconnected([&](const WiFiEventStationModeDisconnected &e) {
             Serial.println("WiFi disconnect");
             if (wifi_c)
             {
+                Serial.println("WiFi disconnect accepted");
                 ws_ticker.detach();
+                web_ticker.detach();
                 wifi_c = false;
                 bind_next();
             }
@@ -385,24 +349,15 @@ void WebClient::connect(const char *ssid, bool bind_connection)
     {
         Serial.println("Normal");
 
-        WiFi.disconnect();
         bind = false;
-        connectHandler = WiFi.onStationModeConnected([&](const WiFiEventStationModeConnected &e) {
-            wifi_c = true;
-            _wificonnect(e);
 
-            ws_ticker.attach_ms<WebClient *>(500, [](WebClient *wc) {
-                if (WiFi.gatewayIP() != INADDR_NONE)
-                    wc->ws_connect(WiFi.gatewayIP(), 80, "/ws");
-            },
-                                             this);
-        });
         disconnectHandler = WiFi.onStationModeDisconnected([&](const WiFiEventStationModeDisconnected &e) {
             Serial.println("WiFi disconnect 1");
             if (wifi_c)
             {
+                Serial.println("WiFi disconnect accepted 1");
                 ws_ticker.detach();
-                webSocket.disconnect();
+                web_ticker.detach();
                 wifi_c = false;
                 ws_c = false;
                 _wifidisconnect(e);
@@ -420,6 +375,12 @@ void WebClient::ws_connect(IPAddress host, uint16_t port, const char *url)
     Serial.print("ws_connect; host: ");
     Serial.println(host);
     webSocket.begin(host, port, url);
+    webSocket.onEvent(std::bind(&WebClient::webSocketEvent, this,
+                                std::placeholders::_1,
+                                std::placeholders::_2,
+                                std::placeholders::_3));
+    webSocket.setReconnectInterval(5000);
+    Serial.print("ws_connect_end");
 }
 
 bool WebClient::bind_connection()

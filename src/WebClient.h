@@ -156,6 +156,13 @@ public:
   void onAlarm(Event eventFunc);
 
   /**
+   * @brief Set handler for onRestart event
+   * 
+   * @param eventFunc 
+   */
+  void onRestart(Event eventFunc);
+
+  /**
    * @brief Set handler for onConnect event 
    * 
    * @param eventFunc 
@@ -238,6 +245,7 @@ private:
   Event _stopevent;
   Event _calibevent;
   Event _alarmevent;
+  Event _restartevent;
   IntEvent _vibroevent;
   BoolEvent _ledioevent;
   Event _getcolor;
@@ -247,7 +255,6 @@ private:
   WiFiConnectedEvent _wificonnect = [](const WiFiEventStationModeConnected &) {};
   Event _disconnect;
   WiFiDisconnectedEvent _wifidisconnect = [](const WiFiEventStationModeDisconnected &) {};
-  ;
 
   WiFiEventHandler connectHandler;
   WiFiEventHandler disconnectHandler;

@@ -80,11 +80,16 @@ public:
   void set_availability(bool enable);
 
   /**
+   * @brief Transition from old colors to new colors
+   * 
+   */
+  void transition_blink(uint16_t frequency = 25);
+
+  /**
    * @brief Main loop of led
    * 
    */
-  void
-  smooth_blink(uint16_t frequency);
+  void smooth_blink(uint16_t frequency, bool delay = false);
 
   /**
    * @brief Setup color of lighting 
@@ -121,12 +126,12 @@ public:
   /**
    * @brief Cross fading between two colors
    */
-  void CrossFade(RGB first, RGB second = {0, 0, 0});
+  void CrossFade(RGB first, RGB second = {0, 0, 0}, bool withTransition = true, bool delay = true);
 
   /**
    * @brief Cross fading between two colors
    */
-  void CrossFade(uint16_t colors[6]);
+  void CrossFade(uint16_t colors[6], bool withTransition = true, bool delay = true);
 
   /**
    * @brief Alarm indication
@@ -156,6 +161,17 @@ public:
    */
   void SingleBlink(RGB col);
 
+  void PrintCurrent()
+  {
+    Serial.print("current values:");
+    Serial.print("R:");
+    Serial.print(current.R);
+    Serial.print("\tG:");
+    Serial.print(current.G);
+    Serial.print("\tB:");
+    Serial.println(current.B);
+  }
+
 private:
   /**
    * @brief Switch led state machine to ON state
@@ -183,8 +199,17 @@ private:
    */
   void killAfter(uint32_t milliseconds);
 
+  /**
+   * @brief Detach led_ticker after milliseconds and run blink
+   * 
+   * 
+   * @param milliseconds 
+   */
+  void blinkAfter(uint32_t milliseconds);
+
   Ticker led_ticker;
   Ticker ticker_killer;
+  Ticker transition_ticker;
 
   RGB color = NONE;
   RGB sec_color = NONE;
@@ -216,8 +241,11 @@ private:
   RGB current = NONE;
   RGB steps = NONE;
   bool rise = true;
-
+  uint8_t current_step = 0;
   bool enabled = true;
+
+  uint16_t delay_cycles = 0;
+  bool delay_active = false;
 
   /**
    * @brief Calculate steps to all of colors
@@ -259,23 +287,12 @@ private:
   static RGB calculate_values(RGB current, RGB steps, RGB color, RGB sec_color, bool &rise);
 
   /**
-   * @brief Check color to owerflow
-   * 
-   * Check if some of leds out of range
-   * Return true if value out of range
-   * 
-   * @param val 
-   * @return true 
-   * @return false 
-   */
-  static bool owerflow_check(RGB val, RGB steps, RGB color, RGB sec_color);
-  /**
    * @brief Set color of RGB led
    * 
    * @param col 
    */
   void set_color(RGB col, bool alarm = false);
-  void update_color(int16_t current);
+
   /**
    * @brief Switch mode of led state machine
    * 

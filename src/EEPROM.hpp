@@ -212,4 +212,14 @@ void ReadRGB(uint16_t *buf, uint16_t address)
     delete[] pre;
 }
 
+bool CompareArrays(uint16_t *arr1, uint16_t *arr2, uint16_t length)
+{
+    for (int i = 0; i < length; ++i)
+    {
+        if (arr1[i] != arr2[i])
+            return false;
+    }
+    return true;
+}
+
 #endif

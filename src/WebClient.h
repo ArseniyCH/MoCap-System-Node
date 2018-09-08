@@ -160,7 +160,7 @@ public:
    * 
    * @param eventFunc 
    */
-  void onRestart(Event eventFunc);
+  void onRestart(IntEvent eventFunc);
 
   /**
    * @brief Set handler for onConnect event 
@@ -245,7 +245,7 @@ private:
   Event _stopevent;
   Event _calibevent;
   Event _alarmevent;
-  Event _restartevent;
+  IntEvent _restartevent;
   IntEvent _vibroevent;
   BoolEvent _ledioevent;
   Event _getcolor;

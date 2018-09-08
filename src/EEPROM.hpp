@@ -146,6 +146,9 @@ uint16_t ReadInt(uint16_t addr)
     number = number << 8;
     number |= EEPROM.read(addr);
 
+    Serial.print("Address: ");
+    Serial.println(addr);
+
     Serial.print("OK: ");
     Serial.print(EEPROM.read(addr - 1));
     Serial.println(EEPROM.read(addr));
@@ -168,8 +171,8 @@ void WriteRGB(uint16_t *buf, uint16_t address, bool is8bit = false)
             EEPROM.write(address++, buf[i]);
     }
 
-    EEPROM.write(address + color_size * 2, 'o');
-    EEPROM.write(address + color_size * 2 + 1, 'k');
+    EEPROM.write(address++, 'o');
+    EEPROM.write(address, 'k');
 
     EEPROM.commit();
 }
@@ -178,15 +181,13 @@ void ReadMappedRGB(uint8_t *buf, uint16_t address)
 {
     EEPROM.begin(512);
 
-    int16_t check = ReadInt(address + color_size * 2);
-    Serial.print("check: ");
-    Serial.println(check);
+    uint16_t check = ReadInt(address + color_size * 2);
     if (check != 28523)
     {
+        EEPROM.end();
         memset(buf, 0, color_size * 2);
         buf[2] = 0xFF;
         WriteRGB((uint16_t *)buf, address, true);
-        EEPROM.end();
         return;
     }
 
@@ -212,6 +213,20 @@ void ReadRGB(uint16_t *buf, uint16_t address)
     delete[] pre;
 }
 
+void ClearMemory()
+{
+    int SIZE = 512;
+    EEPROM.begin(SIZE);
+    for (int i = 0; i < SIZE; i++)
+    {
+        EEPROM.write(i, 0);
+        Serial.print(0);
+        delay(10);
+    }
+    EEPROM.commit();
+    Serial.print("[done]");
+}
+
 bool CompareArrays(uint16_t *arr1, uint16_t *arr2, uint16_t length)
 {
     for (int i = 0; i < length; ++i)
@@ -220,6 +235,6 @@ bool CompareArrays(uint16_t *arr1, uint16_t *arr2, uint16_t length)
             return false;
     }
     return true;
-}
+};
 
 #endif

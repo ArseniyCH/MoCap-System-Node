@@ -117,17 +117,17 @@ void MPU::mpu_setup()
     }
 }
 
-void MPU::mpu_loop(uint8_t *quat)
+bool MPU::mpu_loop(uint8_t *quat)
 {
     if (!enabled)
-        return;
+        return false;
     // if programming failed, don't try to do anything
     if (!dmpReady)
-        return;
+        return false;
 
     // wait for MPU interrupt or extra packet(s) available
     if (!mpuInterrupt && fifoCount < packetSize)
-        return;
+        return false;
 
     // reset interrupt flag and get INT_STATUS byte
     mpuInterrupt = false;
@@ -169,5 +169,9 @@ void MPU::mpu_loop(uint8_t *quat)
         memcpy(quat + sizeof(float), &q.x, sizeof(float));
         memcpy(quat + 2 * sizeof(float), &q.y, sizeof(float));
         memcpy(quat + 3 * sizeof(float), &q.z, sizeof(float));
+
+        return true;
     }
+
+    return false;
 }

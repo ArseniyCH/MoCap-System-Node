@@ -26,6 +26,25 @@ WebClient::WebClient(String bridge_id)
     WiFi.disconnect();
     WiFi.mode(WIFI_STA);
     WiFi.setAutoReconnect(true);
+
+    connectHandler = WiFi.onStationModeConnected([&](const WiFiEventStationModeConnected &e) {
+        Serial.println("WiFi connect");
+        wifi_c = true;
+        _wificonnect(e);
+
+        if (WiFi.gatewayIP() != INADDR_NONE)
+            ws_connect(WiFi.gatewayIP(), 80, "/ws");
+        else
+            ws_ticker.attach_ms<WebClient *>(500, [](WebClient *wc) {
+                if (WiFi.gatewayIP() != INADDR_NONE)
+                {
+                    Serial.println("Hi!");
+                    wc->ws_connect(WiFi.gatewayIP(), 80, "/ws");
+                    wc->ws_ticker.detach();
+                }
+            },
+                                             this);
+    });
 }
 
 bool WebClient::isConnected()
@@ -46,15 +65,15 @@ void WebClient::webSocketEvent(WStype_t type, uint8_t *payload, size_t length)
         USE_SERIAL.printf("[WSc] Disconnected!\n");
         if (!ws_c)
             break;
+
         if (bind)
         {
             bind_next();
         }
-        else
-        {
+        else if (wifi_c)
             WiFi.disconnect();
-            //  _disconnect();
-        }
+        else
+            _disconnect();
         ws_c = false;
         break;
     case WStype_CONNECTED:
@@ -76,7 +95,7 @@ void WebClient::webSocketEvent(WStype_t type, uint8_t *payload, size_t length)
         hexdump(payload, length);
         Serial.print("Get binary; length: ");
         Serial.println(length);
-        Serial.print("content :");
+        Serial.println("content :");
         for (int i = 0; i < length; ++i)
         {
             Serial.print(i);
@@ -156,7 +175,9 @@ void WebClient::webSocketEvent(WStype_t type, uint8_t *payload, size_t length)
             break;
         //Get MAC command
         case 0x15:
+            Serial.println("Send MAC");
             sendMac();
+            Serial.println("Send MAC end");
             break;
         //Bind accept command
         case 0xC8:
@@ -183,11 +204,16 @@ void WebClient::webSocketEvent(WStype_t type, uint8_t *payload, size_t length)
                 // _disconnect();
             }
             break;
+            //Reset command
+        case 0x96:
+        {
+            if (length > 1)
+                _restartevent(payload[1]);
+            else
+                _restartevent(0);
         }
-    case 0x96:
-        if (_restartevent)
-            _restartevent();
         break;
+        }
     }
 }
 
@@ -241,7 +267,7 @@ void WebClient::onAlarm(Event event)
     _alarmevent = event;
 }
 
-void WebClient::onRestart(Event event)
+void WebClient::onRestart(IntEvent event)
 {
     _restartevent = event;
 }
@@ -281,9 +307,10 @@ void WebClient::sendTXT(String str)
 
 void WebClient::sendMac()
 {
-    uint8_t buf[6];
-    WiFi.macAddress(buf);
-    sendBin(buf, 6);
+    uint8_t buf[7];
+    buf[0] = 0x15;
+    WiFi.macAddress(&(buf[0]) + sizeof(uint8_t));
+    sendBin(buf, 7);
 }
 
 void WebClient::sendBridgeID()
@@ -302,26 +329,6 @@ void WebClient::connect(const char *ssid, bool bind_connection)
 {
     Serial.print("Connecting to ");
     Serial.println(ssid);
-    //WiFi connection
-
-    connectHandler = WiFi.onStationModeConnected([&](const WiFiEventStationModeConnected &e) {
-        Serial.println("WiFi connect");
-        wifi_c = true;
-        _wificonnect(e);
-
-        if (WiFi.gatewayIP() != INADDR_NONE)
-            ws_connect(WiFi.gatewayIP(), 80, "/ws");
-        else
-            ws_ticker.attach_ms<WebClient *>(500, [](WebClient *wc) {
-                if (WiFi.gatewayIP() != INADDR_NONE)
-                {
-                    Serial.println("Hi!");
-                    wc->ws_connect(WiFi.gatewayIP(), 80, "/ws");
-                    wc->ws_ticker.detach();
-                }
-            },
-                                             this);
-    });
 
     if (bind_connection)
     {

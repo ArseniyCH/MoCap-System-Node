@@ -14,7 +14,7 @@ Vibro::Vibro(uint8_t pin)
 {
     _pin = pin;
     pinMode(pin, OUTPUT);
-    digitalWrite(pin, LOW);
+    digitalWrite(pin, HIGH);
 }
 
 void Vibro::AlarmVibration()
@@ -58,12 +58,12 @@ void Vibro::SingleVibration(uint16_t milliseconds, uint16_t power)
 
 void Vibro::on(uint16_t power)
 {
-    analogWrite(_pin, power);
+    analogWrite(_pin, 1023 - power);
 }
 
 void Vibro::off()
 {
-    digitalWrite(_pin, LOW);
+    digitalWrite(_pin, HIGH);
 }
 
 void Vibro::killAfter(uint32_t milliseconds)

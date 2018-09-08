@@ -9,7 +9,7 @@
 #ifndef STATEMACHINE_H
 #define STATEMACHINE_H
 
-#define DEV_MODE
+//#define DEV_MODE
 
 #include <WString.h>
 
@@ -39,10 +39,10 @@ uint16_t mem_colors[6];
 WebClient wc = WebClient(ReadString(10));
 
 MPU &mpu = MPU::Instance();
-Vibro vibr = Vibro(4);
+Vibro vibr = Vibro(2);
 State _state = Undef;
 
-Ticker MPU_ticker;
+Ticker restart_ticker;
 
 uint8_t *quat = new uint8_t[4 * sizeof(float)];
 
@@ -76,11 +76,12 @@ void setState(State state)
     break;
   case Active:
     Serial.println("Exit from Active state");
-    MPU_ticker.detach();
+    //MPU_ticker.detach();
     mpu.disable();
     break;
   case Search:
     Serial.println("Exit from Search state");
+    vibr.SingleVibration();
     // state Searching exit logic
     break;
   }
@@ -137,7 +138,7 @@ void stateCalibration()
   led.Calibration();
 
   setState(Calibration);
-  Serial.println("Switch to Search state");
+  Serial.println("Switch to Calibration state");
 }
 
 /**
@@ -161,18 +162,18 @@ void stateActive()
   setState(Active);
   Serial.println("Switch to Active state");
   mpu.enable();
-#ifdef DEV_MODE
-  MPU_ticker.attach_ms(50, []() {
-    uint8_t *quat = (uint8_t *)"0000000000000000";
-    wc.sendBin(quat, 4 * sizeof(float), MPU_DATA);
-  });
-#else
-  MPU_ticker.attach_ms(50, []() {
-    mpu.mpu_loop(quat);
-    if (quat)
-      wc.sendBin(quat, 4 * sizeof(float), MPU_DATA);
-  });
-#endif
+  // #ifdef DEV_MODE
+  //   MPU_ticker.attach_ms(50, []() {
+  //     uint8_t *quat = (uint8_t *)"0000000000000000";
+  //     wc.sendBin(quat, 4 * sizeof(float), MPU_DATA);
+  //   });
+  // #else
+  //   MPU_ticker.attach_ms(50, []() {
+  //     mpu.mpu_loop(quat);
+  //     if (quat)
+  //       wc.sendBin(quat, 4 * sizeof(float), MPU_DATA);
+  //   });
+  // #endif
 }
 
 /**
@@ -194,10 +195,7 @@ void disconnect()
 {
   Serial.println("Disconnected((");
   if (_state != Search)
-  {
-    led.BlueBlink();
     stateSearch();
-  }
 }
 
 /**
@@ -258,12 +256,15 @@ void changeSSID(String ssid)
   SaveString(10, (uint8_t *)ssid.c_str(), ssid.length());
 }
 
-void Restart()
+void Restart(uint16_t seconds)
 {
   if (_state != Standby)
     return;
 
-  ESP.restart();
+  if (seconds > 10)
+    seconds = 10;
+
+  restart_ticker.attach(seconds, []() { ESP.restart(); });
 }
 
 /**
@@ -289,12 +290,13 @@ void state_setup()
   wc.onAlarm(Alarm);
   wc.onRestart(Restart);
 
+  delay(1);
   ReadRGB(mem_colors, COLOR_ADDRESS);
 
-#ifndef DEV_MODE
+  //#ifndef DEV_MODE
   mpu.mpu_setup();
   mpu.disable();
-#endif
+  //#endif
 
   if (wc.bind_connection())
     stateBind();
@@ -312,6 +314,10 @@ void state_setup()
 void state_loop()
 {
   wc.loop();
+
+  if (_state == Active)
+    if (mpu.mpu_loop(quat))
+      wc.sendBin(quat, 4 * sizeof(float), MPU_DATA);
 };
 
 #endif

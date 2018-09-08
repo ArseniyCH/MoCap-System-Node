@@ -69,7 +69,6 @@ void LED::smooth_blink(uint16_t frequency, bool delay)
     delay_active = delay;
     current_step = 0;
     led_ticker.attach_ms<LED *>(frequency, [](LED *led) {
-        led->PrintCurrent();
         if (led->delay_cycles > 0)
             led->delay_cycles--;
         else

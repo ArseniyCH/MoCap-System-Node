@@ -29,7 +29,7 @@ public:
    * @brief Loop of MPU
    *  
    */
-  void mpu_loop(uint8_t *quat);
+  bool mpu_loop(uint8_t *quat);
 
   /**
    * @brief Calibration of MPU

@@ -184,10 +184,12 @@ void WebClient::webSocketEvent(WStype_t type, uint8_t *payload, size_t length)
             if (bind && _changessid)
             {
                 Serial.println("Accept bind command");
-                String ssid = WiFi.SSID(i_ssid);
+                String ssid = WiFi.SSID();
+                Serial.print("SSID: ");
+                Serial.println(ssid);
                 if (!ssid.startsWith("mcsbnd_") || !ssid.length() > 7)
                     break;
-                b_id = WiFi.SSID(i_ssid).substring(7);
+                b_id = ssid.substring(7);
                 strcpy(this->ssid, ("mcs_" + b_id).c_str());
                 _changessid(b_id);
                 bind = false;
